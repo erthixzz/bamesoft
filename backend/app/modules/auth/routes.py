@@ -1,0 +1,23 @@
+"""Endpoints de autenticación."""
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+
+from app.modules.auth import service
+from app.modules.auth.deps import require_authenticated
+from app.modules.auth.schemas import LoginIn, TokenOut
+from app.modules.users.models import User
+from app.modules.users.schemas import UserOut
+
+router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+@router.post("/login", response_model=TokenOut)
+async def login(payload: LoginIn) -> TokenOut:
+    """Login por contraseña (proxy a Supabase Auth)."""
+    return await service.password_login(payload)
+
+
+@router.get("/whoami", response_model=UserOut)
+async def whoami(current: User = Depends(require_authenticated)) -> User:
+    return current

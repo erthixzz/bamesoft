@@ -1,0 +1,68 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "bamesoft-api"
+version = "0.1.0"
+description = "Bamesoft — Biomedical Asset Management & Engineering Software (API)"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [{ name = "Avatarflower" }]
+dependencies = [
+  "fastapi>=0.115",
+  "uvicorn[standard]>=0.30",
+  "sqlalchemy>=2.0.30",
+  "asyncpg>=0.29",
+  "alembic>=1.13",
+  "pydantic[email]>=2.7",
+  "pydantic-settings>=2.3",
+  "python-jose[cryptography]>=3.3",
+  "passlib[bcrypt]>=1.7",
+  "supabase>=2.5",
+  "httpx>=0.27",
+  "python-multipart>=0.0.9",
+  "qrcode[pil]>=7.4",
+  "loguru>=0.7",
+  "python-dateutil>=2.9",
+  "orjson>=3.10",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.2",
+  "pytest-asyncio>=0.23",
+  "pytest-cov>=5.0",
+  "httpx>=0.27",
+  "ruff>=0.5",
+  "mypy>=1.10",
+  "types-python-jose",
+  "types-passlib",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "N", "UP", "B", "A", "C4", "SIM", "RUF"]
+# B008 — FastAPI usa Depends() en valores por defecto.
+# UP037 — SQLAlchemy 2.0 necesita los forward refs como strings reales.
+# A005 — algunos módulos comparten nombre con stdlib (logging.py, errors.py); aceptable.
+# N811 — alias `PgEnum` para `ENUM` mejora legibilidad.
+# E741 — `I` es nombre canónico de la clase de riesgo IEC.
+ignore = ["B008", "UP037", "A005", "N811", "E741"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+plugins = ["pydantic.mypy"]
+ignore_missing_imports = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+addopts = "-q --strict-markers"
+testpaths = ["tests"]
