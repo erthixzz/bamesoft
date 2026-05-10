@@ -79,8 +79,8 @@
 {:else if error || !eq}
   <p class="text-danger-600">{error ?? 'No se encontró'}</p>
 {:else}
-  <div class="mb-4 flex justify-end gap-2">
-    <a class="btn-secondary" href={`/cases/new?equipment_id=${eq.id}`}>+ Caso para este equipo</a>
+  <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+    <a class="btn-secondary text-center" href={`/cases/new?equipment_id=${eq.id}`}>+ Caso para este equipo</a>
     <Button on:click={() => (editOpen = true)}>
       <Pencil class="h-4 w-4" /> Editar
     </Button>

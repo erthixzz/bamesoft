@@ -46,17 +46,17 @@
   });
 </script>
 
-<div class="mb-4 flex justify-end gap-2">
+<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
   <Button variant="secondary" on:click={sweep} {loading}>Generar automáticas</Button>
-  <a class="btn-primary" href="/alerts/new">+ Nueva alerta</a>
+  <a class="btn-primary text-center" href="/alerts/new">+ Nueva alerta</a>
 </div>
 
 <div class="grid gap-3">
   {#each rows as a}
     <Card>
-      <div class="flex items-center justify-between">
-        <div>
-          <div class="flex items-center gap-2">
+      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center gap-2">
             <Badge tone={tone(a.severity)}>{a.severity}</Badge>
             <span class="text-xs uppercase text-slate-500">{a.type}</span>
           </div>
@@ -66,7 +66,7 @@
             {timeFromNow(a.created_at)} · vence {formatDate(a.due_at)}
           </p>
         </div>
-        <div class="flex gap-2">
+        <div class="flex flex-wrap gap-2 sm:shrink-0">
           {#if !a.acknowledged_at}
             <Button variant="secondary" on:click={() => ack(a.id)}>Reconocer</Button>
           {/if}

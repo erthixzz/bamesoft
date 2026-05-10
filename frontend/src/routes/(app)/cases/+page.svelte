@@ -30,7 +30,7 @@
 </script>
 
 <div class="mb-4 flex justify-end">
-  <a class="btn-primary" href="/cases/new">+ Nuevo caso</a>
+  <a class="btn-primary w-full sm:w-auto" href="/cases/new">+ Nuevo caso</a>
 </div>
 
 <Table {columns} {rows}>

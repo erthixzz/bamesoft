@@ -39,12 +39,14 @@
   });
 </script>
 
-<div class="mb-4 flex items-center gap-3">
-  <div class="max-w-sm flex-1">
+<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+  <div class="w-full sm:max-w-sm sm:flex-1">
     <Input placeholder="Buscar por código, nombre, serial…" bind:value={q} on:input={load} />
   </div>
-  <a class="btn-secondary" href="/equipment/scan">📷 Escanear QR</a>
-  <a class="btn-primary ml-auto" href="/equipment/new">+ Nuevo equipo</a>
+  <div class="flex flex-wrap gap-2 sm:ml-auto">
+    <a class="btn-secondary flex-1 sm:flex-none" href="/equipment/scan">📷 Escanear QR</a>
+    <a class="btn-primary flex-1 sm:flex-none" href="/equipment/new">+ Nuevo equipo</a>
+  </div>
 </div>
 
 <Table {columns} {rows}>

@@ -33,7 +33,7 @@
   <Sidebar />
   <div class="flex w-full min-w-0 flex-col">
     <Header />
-    <main class="min-w-0 flex-1 overflow-x-hidden p-6">
+    <main class="min-w-0 flex-1 overflow-x-hidden p-3 sm:p-4 lg:p-6">
       {#if booting}
         <Spinner label="Cargando perfil…" />
       {:else if bootError}
@@ -48,10 +48,12 @@
             <li>El navegador está en <code>127.0.0.1:5173</code> pero CORS solo permite <code>localhost:5173</code> (o viceversa)</li>
             <li>El JWT no es válido o expiró</li>
           </ul>
-          <button class="btn-secondary mt-4" on:click={() => location.reload()}>Reintentar</button>
-          <button class="btn-danger ml-2" on:click={() => logout().then(() => goto('/login'))}>
-            Cerrar sesión
-          </button>
+          <div class="mt-4 flex flex-wrap gap-2">
+            <button class="btn-secondary" on:click={() => location.reload()}>Reintentar</button>
+            <button class="btn-danger" on:click={() => logout().then(() => goto('/login'))}>
+              Cerrar sesión
+            </button>
+          </div>
         </div>
       {:else}
         <slot />

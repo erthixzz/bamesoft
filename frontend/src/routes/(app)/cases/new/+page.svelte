@@ -86,7 +86,7 @@
 </script>
 
 <form on:submit={onSubmit} class="grid gap-4 lg:grid-cols-3">
-  <div class="lg:col-span-2">
+  <div class="min-w-0 lg:col-span-2">
     <Card title="Datos del caso">
       <div class="grid gap-4">
         <Input label="Título *" bind:value={form.title} required placeholder="Ventilador no enciende" />

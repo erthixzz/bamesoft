@@ -87,7 +87,7 @@
 </script>
 
 <form on:submit={onSubmit} class="grid gap-4 lg:grid-cols-3">
-  <div class="lg:col-span-2">
+  <div class="min-w-0 lg:col-span-2">
     <Card title="Información del equipo">
       <div class="grid gap-4 sm:grid-cols-2">
         <Input label="Código *" bind:value={form.code} required placeholder="EQ-0010" />
