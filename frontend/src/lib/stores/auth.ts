@@ -11,6 +11,7 @@ export interface Profile {
   active: boolean;
   avatar_url?: string | null;
   clinic_id?: string | null;
+  clinic_name?: string | null;
 }
 
 export const session = writable<Session | null>(null);

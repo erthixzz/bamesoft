@@ -43,6 +43,9 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     equipment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("equipment.id", ondelete="CASCADE"), nullable=False
     )
+    sector_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sectors.id", ondelete="SET NULL")
+    )
     reported_by: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL")
     )

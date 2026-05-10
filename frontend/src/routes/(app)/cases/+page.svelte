@@ -29,6 +29,10 @@
   });
 </script>
 
+<div class="mb-4 flex justify-end">
+  <a class="btn-primary" href="/cases/new">+ Nuevo caso</a>
+</div>
+
 <Table {columns} {rows}>
   <svelte:fragment slot="cell" let:row let:column>
     {#if column === 'status'}

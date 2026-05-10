@@ -2,8 +2,11 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import Card from '$lib/components/Card.svelte';
+  import Button from '$lib/components/Button.svelte';
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
+  import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
+  import { Pencil, FileUp } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { casesApi } from '$lib/modules/cases/api';
   import { calibrationsApi } from '$lib/modules/calibrations/api';
@@ -25,6 +28,8 @@
   let docs: Doc[] = [];
   let loading = true;
   let error: string | null = null;
+  let editOpen = false;
+  let uploading = false;
 
   $: id = $page.params.id ?? '';
   $: setPageTitle(eq ? `${eq.code} · ${eq.name}` : 'Equipo');
@@ -44,6 +49,28 @@
       loading = false;
     }
   });
+
+  function onSaved(e: CustomEvent<Equipment>) {
+    eq = e.detail;
+  }
+
+  async function onFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !eq) return;
+    uploading = true;
+    try {
+      await documentsApi.upload(file, {
+        title: file.name,
+        type: 'manual',
+        equipment_id: eq.id,
+      });
+      docs = await documentsApi.forEquipment(eq.id);
+    } finally {
+      uploading = false;
+      input.value = '';
+    }
+  }
 </script>
 
 {#if loading}
@@ -51,6 +78,13 @@
 {:else if error || !eq}
   <p class="text-danger-600">{error ?? 'No se encontró'}</p>
 {:else}
+  <div class="mb-4 flex justify-end gap-2">
+    <a class="btn-secondary" href={`/cases/new?equipment_id=${eq.id}`}>+ Caso para este equipo</a>
+    <Button on:click={() => (editOpen = true)}>
+      <Pencil class="h-4 w-4" /> Editar
+    </Button>
+  </div>
+
   <div class="grid gap-4 lg:grid-cols-3">
     <Card title="Información general">
       <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
@@ -119,8 +153,16 @@
       </ul>
     </Card>
 
-    <Card title={`Documentos (${docs.length})`}>
-      <ul class="space-y-2 text-sm">
+    <Card>
+      <div slot="actions">
+        <label class="btn-secondary inline-flex cursor-pointer items-center gap-2">
+          <FileUp class="h-4 w-4" />
+          {uploading ? 'Subiendo…' : 'Subir documento'}
+          <input type="file" class="hidden" on:change={onFile} disabled={uploading} />
+        </label>
+      </div>
+      <h3 class="text-base font-semibold">Documentos ({docs.length})</h3>
+      <ul class="mt-3 space-y-2 text-sm">
         {#each docs as d}
           <li class="flex justify-between border-b border-slate-100 py-2 last:border-0">
             <span>{d.title} <span class="text-xs text-slate-400">({d.type})</span></span>
@@ -132,4 +174,6 @@
       </ul>
     </Card>
   </div>
+
+  <EquipmentEditModal bind:open={editOpen} equipment={eq} on:saved={onSaved} />
 {/if}

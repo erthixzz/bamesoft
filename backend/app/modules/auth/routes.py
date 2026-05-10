@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.session import get_session
 from app.modules.auth import service
 from app.modules.auth.deps import require_authenticated
 from app.modules.auth.schemas import LoginIn, TokenOut
+from app.modules.clinics.models import Clinic
 from app.modules.users.models import User
 from app.modules.users.schemas import UserOut
 
@@ -19,5 +22,13 @@ async def login(payload: LoginIn) -> TokenOut:
 
 
 @router.get("/whoami", response_model=UserOut)
-async def whoami(current: User = Depends(require_authenticated)) -> User:
-    return current
+async def whoami(
+    current: User = Depends(require_authenticated),
+    db: AsyncSession = Depends(get_session),
+) -> UserOut:
+    clinic_name: str | None = None
+    if current.clinic_id:
+        clinic = await db.get(Clinic, current.clinic_id)
+        clinic_name = clinic.name if clinic else None
+    out = UserOut.model_validate(current)
+    return out.model_copy(update={"clinic_name": clinic_name})

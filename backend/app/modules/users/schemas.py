@@ -40,5 +40,6 @@ class UserOut(UserBase):
     id: uuid.UUID
     avatar_url: str | None = None
     active: bool
+    clinic_name: str | None = None
     created_at: datetime
     updated_at: datetime

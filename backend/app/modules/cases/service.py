@@ -47,12 +47,22 @@ async def get_case(db: AsyncSession, case_id: uuid.UUID) -> Case:
 
 
 async def create_case(db: AsyncSession, payload: CaseCreate, reporter_id: uuid.UUID) -> Case:
+    data = payload.model_dump()
+
+    # Si llega un sector pero no hay asignado, usar el ingeniero por defecto.
+    if data.get("sector_id") and not data.get("assigned_to"):
+        from app.modules.sectors.models import Sector  # import tardío para evitar ciclos
+
+        sector = await db.get(Sector, data["sector_id"])
+        if sector and sector.default_engineer_id:
+            data["assigned_to"] = sector.default_engineer_id
+
     obj = Case(
         code=_new_case_code(),
         reported_by=reporter_id,
         opened_at=datetime.now(UTC),
-        status=CaseStatus.ASSIGNED if payload.assigned_to else CaseStatus.OPEN,
-        **payload.model_dump(),
+        status=CaseStatus.ASSIGNED if data.get("assigned_to") else CaseStatus.OPEN,
+        **data,
     )
     db.add(obj)
     await db.flush()

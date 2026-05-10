@@ -13,5 +13,6 @@ from app.modules.clinics.models import Clinic, Location  # noqa: F401
 from app.modules.documents.models import Document  # noqa: F401
 from app.modules.equipment.models import Equipment, EquipmentCategory  # noqa: F401
 from app.modules.maintenance.models import MaintenanceSchedule  # noqa: F401
+from app.modules.sectors.models import Sector  # noqa: F401
 from app.modules.standards.models import EquipmentStandard, Standard  # noqa: F401
 from app.modules.users.models import User  # noqa: F401

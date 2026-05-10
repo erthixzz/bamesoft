@@ -46,8 +46,9 @@
   });
 </script>
 
-<div class="mb-4 flex justify-end">
-  <Button variant="secondary" on:click={sweep} {loading}>Generar alertas</Button>
+<div class="mb-4 flex justify-end gap-2">
+  <Button variant="secondary" on:click={sweep} {loading}>Generar automáticas</Button>
+  <a class="btn-primary" href="/alerts/new">+ Nueva alerta</a>
 </div>
 
 <div class="grid gap-3">

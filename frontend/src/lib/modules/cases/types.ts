@@ -9,6 +9,7 @@ export interface Case {
   status: CaseStatus;
   priority: CasePriority;
   equipment_id: string;
+  sector_id?: string | null;
   reported_by?: string | null;
   assigned_to?: string | null;
   opened_at?: string | null;
@@ -24,6 +25,7 @@ export interface CaseCreate {
   type: CaseType;
   priority?: CasePriority;
   equipment_id: string;
+  sector_id?: string;
   assigned_to?: string;
   sla_due_at?: string;
 }

@@ -15,6 +15,7 @@ class CaseBase(BaseModel):
     type: CaseType
     priority: CasePriority = CasePriority.MEDIUM
     equipment_id: uuid.UUID
+    sector_id: uuid.UUID | None = None
     assigned_to: uuid.UUID | None = None
     sla_due_at: datetime | None = None
 
@@ -28,6 +29,7 @@ class CaseUpdate(BaseModel):
     description: str | None = None
     priority: CasePriority | None = None
     status: CaseStatus | None = None
+    sector_id: uuid.UUID | None = None
     assigned_to: uuid.UUID | None = None
     sla_due_at: datetime | None = None
 
