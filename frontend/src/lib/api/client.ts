@@ -67,7 +67,16 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
     } catch {
       /* texto plano */
     }
-    throw new ApiError(res.status, `${res.status} ${res.statusText}`, detail);
+    const detailStr =
+      typeof detail === 'object' && detail && 'detail' in detail
+        ? String((detail as { detail: unknown }).detail)
+        : typeof detail === 'string'
+          ? detail
+          : '';
+    const msg = detailStr
+      ? `${res.status} ${res.statusText} — ${detailStr}`
+      : `${res.status} ${res.statusText}`;
+    throw new ApiError(res.status, msg, detail);
   }
 
   if (res.status === 204) return undefined as T;

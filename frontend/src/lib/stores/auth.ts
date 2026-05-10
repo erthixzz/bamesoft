@@ -35,8 +35,10 @@ export async function initAuth(): Promise<void> {
 }
 
 export async function login(email: string, password: string): Promise<void> {
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) throw error;
+  // Setear el store sincrónicamente para evitar race con el listener async.
+  if (data.session) session.set(data.session);
 }
 
 export async function logout(): Promise<void> {

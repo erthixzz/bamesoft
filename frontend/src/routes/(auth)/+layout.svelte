@@ -1,12 +1,7 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { goto } from '$app/navigation';
-  import { isAuthenticated } from '$lib/stores/auth';
-  import { get } from 'svelte/store';
-
-  onMount(() => {
-    if (get(isAuthenticated)) goto('/dashboard');
-  });
+  // No hacemos goto aquí: dejamos que sea el formulario de login el que
+  // navegue tras autenticación correcta. Esto evita loops cuando ambos
+  // layouts compiten por redirigir.
 </script>
 
 <div class="grid min-h-screen place-items-center bg-gradient-to-br from-brand-50 to-slate-100 p-4">

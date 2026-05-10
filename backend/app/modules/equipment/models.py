@@ -6,13 +6,13 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.enums import EquipmentStatus, RiskClass
 from app.db.mixins import Timestamps, UUIDPrimaryKey
+from app.db.types import pg_enum
 
 if TYPE_CHECKING:
     from app.modules.calibrations.models import Calibration
@@ -49,12 +49,12 @@ class Equipment(Base, UUIDPrimaryKey, Timestamps):
         UUID(as_uuid=True), ForeignKey("equipment_categories.id", ondelete="SET NULL")
     )
     risk_class: Mapped[RiskClass | None] = mapped_column(
-        PgEnum(RiskClass, name="risk_class", create_type=False)
+        pg_enum(RiskClass, "risk_class")
     )
 
     # Estado y ubicación
     status: Mapped[EquipmentStatus] = mapped_column(
-        PgEnum(EquipmentStatus, name="equipment_status", create_type=False),
+        pg_enum(EquipmentStatus, "equipment_status"),
         nullable=False,
         default=EquipmentStatus.OPERATIONAL,
     )

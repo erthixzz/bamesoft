@@ -13,10 +13,17 @@ from app.core.config import settings
 
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=settings.APP_DEBUG and settings.APP_ENV == "development",
+    echo=False,
     pool_pre_ping=True,
     pool_size=5,
     max_overflow=10,
+    # Supabase Pooler (PgBouncer) no soporta prepared statements persistentes;
+    # desactivamos el cache de asyncpg para evitar
+    # "connection was closed in the middle of operation".
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+    },
 )
 
 AsyncSessionLocal = async_sessionmaker(

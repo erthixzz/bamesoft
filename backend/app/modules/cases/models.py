@@ -6,13 +6,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.enums import CasePriority, CaseStatus, CaseType
 from app.db.mixins import Timestamps, UUIDPrimaryKey
+from app.db.types import pg_enum
 
 if TYPE_CHECKING:
     from app.modules.equipment.models import Equipment
@@ -27,15 +27,15 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     description: Mapped[str | None] = mapped_column(Text)
 
     type: Mapped[CaseType] = mapped_column(
-        PgEnum(CaseType, name="case_type", create_type=False), nullable=False
+        pg_enum(CaseType, "case_type"), nullable=False
     )
     status: Mapped[CaseStatus] = mapped_column(
-        PgEnum(CaseStatus, name="case_status", create_type=False),
+        pg_enum(CaseStatus, "case_status"),
         nullable=False,
         default=CaseStatus.OPEN,
     )
     priority: Mapped[CasePriority] = mapped_column(
-        PgEnum(CasePriority, name="case_priority", create_type=False),
+        pg_enum(CasePriority, "case_priority"),
         nullable=False,
         default=CasePriority.MEDIUM,
     )

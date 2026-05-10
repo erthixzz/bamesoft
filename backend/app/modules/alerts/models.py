@@ -6,13 +6,13 @@ from datetime import datetime
 from typing import TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import ENUM as PgEnum
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
 from app.db.enums import AlertSeverity, AlertType
 from app.db.mixins import Timestamps, UUIDPrimaryKey
+from app.db.types import pg_enum
 
 if TYPE_CHECKING:
     from app.modules.cases.models import Case
@@ -23,10 +23,10 @@ class Alert(Base, UUIDPrimaryKey, Timestamps):
     __tablename__ = "alerts"
 
     type: Mapped[AlertType] = mapped_column(
-        PgEnum(AlertType, name="alert_type", create_type=False), nullable=False
+        pg_enum(AlertType, "alert_type"), nullable=False
     )
     severity: Mapped[AlertSeverity] = mapped_column(
-        PgEnum(AlertSeverity, name="alert_severity", create_type=False),
+        pg_enum(AlertSeverity, "alert_severity"),
         nullable=False,
         default=AlertSeverity.INFO,
     )

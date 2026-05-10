@@ -2,10 +2,13 @@
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
   import { get } from 'svelte/store';
-  import { isAuthenticated, profile } from '$lib/stores/auth';
+  import { isAuthenticated, profile, logout } from '$lib/stores/auth';
   import { authApi } from '$lib/modules/auth/api';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Header from '$lib/components/Header.svelte';
+
+  let bootError: string | null = null;
+  let booting = true;
 
   onMount(async () => {
     if (!get(isAuthenticated)) {
@@ -16,10 +19,12 @@
       try {
         const p = await authApi.whoami();
         profile.set(p);
-      } catch {
-        goto('/login');
+      } catch (e) {
+        // No redirigir: muestra el error para depurar (CORS, 401, etc.)
+        bootError = e instanceof Error ? e.message : 'Error desconocido';
       }
     }
+    booting = false;
   });
 </script>
 
@@ -28,7 +33,28 @@
   <div class="flex w-full min-w-0 flex-col">
     <Header />
     <main class="min-w-0 flex-1 overflow-x-hidden p-6">
-      <slot />
+      {#if booting}
+        <p class="text-slate-500">Cargando perfil…</p>
+      {:else if bootError}
+        <div class="mx-auto max-w-2xl rounded-xl border border-danger-500 bg-red-50 p-6">
+          <h2 class="mb-2 text-lg font-semibold text-danger-600">No se pudo cargar el perfil</h2>
+          <p class="mb-3 text-sm text-slate-700"><strong>Error:</strong> {bootError}</p>
+          <p class="text-sm text-slate-700">
+            Posibles causas:
+          </p>
+          <ul class="ml-5 list-disc text-sm text-slate-700">
+            <li>El backend no está corriendo en <code>http://localhost:8000</code></li>
+            <li>El navegador está en <code>127.0.0.1:5173</code> pero CORS solo permite <code>localhost:5173</code> (o viceversa)</li>
+            <li>El JWT no es válido o expiró</li>
+          </ul>
+          <button class="btn-secondary mt-4" on:click={() => location.reload()}>Reintentar</button>
+          <button class="btn-danger ml-2" on:click={() => logout().then(() => goto('/login'))}>
+            Cerrar sesión
+          </button>
+        </div>
+      {:else}
+        <slot />
+      {/if}
     </main>
   </div>
 </div>
