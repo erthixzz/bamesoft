@@ -6,6 +6,7 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
+  import DatePicker from '$lib/components/DatePicker.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { clinicsApi } from '$lib/modules/clinics/api';
   import type { Clinic, Location } from '$lib/modules/clinics/types';
@@ -110,8 +111,8 @@
             { value: 'III', label: 'III — Riesgo crítico' },
           ]}
         />
-        <Input label="Adquirido" type="date" bind:value={form.acquisition_date} />
-        <Input label="Garantía hasta" type="date" bind:value={form.warranty_until} />
+        <DatePicker label="Adquirido" bind:value={form.acquisition_date} />
+        <DatePicker label="Garantía hasta" bind:value={form.warranty_until} />
       </div>
     </Card>
 

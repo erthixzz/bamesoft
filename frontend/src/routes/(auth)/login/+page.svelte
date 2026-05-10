@@ -4,6 +4,7 @@
   import Input from '$lib/components/Input.svelte';
   import { login } from '$lib/stores/auth';
   import { toasts } from '$lib/stores/toasts';
+  import { ArrowRight, ShieldCheck } from 'lucide-svelte';
 
   let email = '';
   let password = '';
@@ -16,7 +17,7 @@
     error = null;
     try {
       await login(email, password);
-      toasts.success('Bienvenido');
+      toasts.success('¡Bienvenido!');
       goto('/dashboard');
     } catch (e) {
       error = e instanceof Error ? e.message : 'Error al iniciar sesión';
@@ -26,18 +27,108 @@
   }
 </script>
 
-<form on:submit={onSubmit} class="card space-y-4">
-  <header>
-    <h2 class="text-lg font-semibold text-slate-900">Iniciar sesión</h2>
-    <p class="text-sm text-slate-500">Accede con tu cuenta corporativa.</p>
-  </header>
+<div class="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
+  <!-- HERO: título gigante con degradado + tagline -->
+  <section class="text-center lg:text-left">
+    <p class="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur">
+      <span class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.6)]"></span>
+      Bienvenido a
+    </p>
 
-  <Input label="Email" type="email" bind:value={email} required />
-  <Input label="Contraseña" type="password" bind:value={password} required />
+    <h1 class="bm-title text-[3.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-7xl lg:text-[5.5rem]">
+      Bamesoft
+    </h1>
 
-  {#if error}
-    <p class="text-sm text-danger-600">{error}</p>
-  {/if}
+    <p class="mt-4 max-w-xl text-lg font-medium text-slate-700 sm:text-xl">
+      Ingeniería biomédica
+      <span class="text-brand-600">·</span>
+      Inteligencia artificial
+      <span class="text-cyan-600">·</span>
+      Cumplimiento clínico
+    </p>
 
-  <Button type="submit" {loading}>Entrar</Button>
-</form>
+    <p class="mt-3 max-w-xl text-sm text-slate-500">
+      Inventario, mantenimientos, calibraciones y normas de tu clínica
+      en una sola plataforma. Simple, potente y siempre auditable.
+    </p>
+
+    <!-- Pildora de seguridad -->
+    <div class="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs text-slate-500 lg:justify-start">
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 ring-1 ring-slate-200 backdrop-blur">
+        <ShieldCheck class="h-3.5 w-3.5 text-emerald-600" />
+        Datos protegidos por Supabase Auth
+      </span>
+      <span class="inline-flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 ring-1 ring-slate-200 backdrop-blur">
+        ISO 13485 · IEC 60601 · INVIMA
+      </span>
+    </div>
+  </section>
+
+  <!-- LOGIN CARD glassmorphism -->
+  <section>
+    <form
+      on:submit={onSubmit}
+      class="relative rounded-2xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-slate-900/5 backdrop-blur-xl"
+    >
+      <!-- Halo del card -->
+      <div class="pointer-events-none absolute -inset-px -z-10 rounded-2xl bg-gradient-to-br from-brand-500/30 via-cyan-400/20 to-emerald-400/20 opacity-50 blur-xl"></div>
+
+      <header class="mb-5 flex items-center gap-3">
+        <div class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-cyan-500 text-lg font-bold text-white shadow-md">
+          B
+        </div>
+        <div>
+          <h2 class="text-base font-semibold text-slate-900">Iniciar sesión</h2>
+          <p class="text-xs text-slate-500">Accede a tu suite biomédica</p>
+        </div>
+      </header>
+
+      <div class="space-y-3">
+        <Input label="Email" type="email" bind:value={email} required placeholder="tu@clinica.com" />
+        <Input label="Contraseña" type="password" bind:value={password} required placeholder="••••••••" />
+      </div>
+
+      {#if error}
+        <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-danger-700">{error}</p>
+      {/if}
+
+      <div class="mt-6">
+        <Button type="submit" {loading}>
+          <span class="flex items-center gap-2">
+            Entrar
+            <ArrowRight class="h-4 w-4" />
+          </span>
+        </Button>
+      </div>
+
+      <p class="mt-4 text-center text-xs text-slate-500">
+        ¿Necesitas una cuenta? Habla con tu administrador.
+      </p>
+    </form>
+  </section>
+</div>
+
+<style>
+  /* Título con degradado animado */
+  .bm-title {
+    background: linear-gradient(
+      120deg,
+      #1971f5 0%,
+      #06b6d4 35%,
+      #10b981 70%,
+      #1971f5 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 9s ease-in-out infinite;
+    text-shadow: 0 4px 24px rgba(25, 113, 245, 0.15);
+  }
+  @keyframes shimmer {
+    0%   { background-position: 0% 50%; }
+    50%  { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+</style>

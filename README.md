@@ -88,4 +88,4 @@ supabase db reset
 
 ---
 
-© Avatarflower — Bamesoft.
+© Bamesoft.

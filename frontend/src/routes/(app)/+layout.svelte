@@ -6,6 +6,7 @@
   import { authApi } from '$lib/modules/auth/api';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Header from '$lib/components/Header.svelte';
+  import Spinner from '$lib/components/Spinner.svelte';
 
   let bootError: string | null = null;
   let booting = true;
@@ -34,7 +35,7 @@
     <Header />
     <main class="min-w-0 flex-1 overflow-x-hidden p-6">
       {#if booting}
-        <p class="text-slate-500">Cargando perfil…</p>
+        <Spinner label="Cargando perfil…" />
       {:else if bootError}
         <div class="mx-auto max-w-2xl rounded-xl border border-danger-500 bg-red-50 p-6">
           <h2 class="mb-2 text-lg font-semibold text-danger-600">No se pudo cargar el perfil</h2>

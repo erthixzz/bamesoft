@@ -6,6 +6,7 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
+  import DatePicker from '$lib/components/DatePicker.svelte';
   import { alertsApi } from '$lib/modules/alerts/api';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import type { Equipment } from '$lib/modules/equipment/types';
@@ -84,7 +85,7 @@
         bind:value={form.equipment_id}
         options={equipment.map((e) => ({ value: e.id, label: `${e.code} · ${e.name}` }))}
       />
-      <Input label="Vence el" type="datetime-local" bind:value={form.due_at} />
+      <DatePicker label="Vence el" mode="datetime" bind:value={form.due_at} />
     </div>
   </Card>
   <div class="mt-4 flex gap-2">

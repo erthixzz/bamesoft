@@ -6,6 +6,7 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
+  import DatePicker from '$lib/components/DatePicker.svelte';
   import { casesApi } from '$lib/modules/cases/api';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
@@ -141,7 +142,7 @@
           Si dejas el ingeniero en blanco y eliges sector, se asigna automáticamente al
           ingeniero por defecto del sector.
         </p>
-        <Input label="SLA (fecha límite)" type="datetime-local" bind:value={form.sla_due_at} />
+        <DatePicker label="SLA (fecha límite)" mode="datetime" bind:value={form.sla_due_at} />
       </div>
     </Card>
 

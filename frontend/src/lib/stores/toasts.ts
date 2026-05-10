@@ -6,24 +6,28 @@ export interface Toast {
   id: number;
   kind: ToastKind;
   message: string;
+  durationMs: number;
 }
+
+const DEFAULT_DURATION_MS = 4000;
 
 function createToasts() {
   const { subscribe, update } = writable<Toast[]>([]);
   let next = 1;
 
-  function push(kind: ToastKind, message: string, durationMs = 4000) {
+  function push(kind: ToastKind, message: string, durationMs = DEFAULT_DURATION_MS) {
     const id = next++;
-    update((list) => [...list, { id, kind, message }]);
+    update((list) => [...list, { id, kind, message, durationMs }]);
     setTimeout(() => update((list) => list.filter((t) => t.id !== id)), durationMs);
+    return id;
   }
 
   return {
     subscribe,
-    success: (m: string) => push('success', m),
-    error: (m: string) => push('error', m),
-    info: (m: string) => push('info', m),
-    warning: (m: string) => push('warning', m),
+    success: (m: string, d?: number) => push('success', m, d),
+    error: (m: string, d?: number) => push('error', m, d ?? 6000),
+    info: (m: string, d?: number) => push('info', m, d),
+    warning: (m: string, d?: number) => push('warning', m, d),
     dismiss: (id: number) => update((list) => list.filter((t) => t.id !== id)),
   };
 }

@@ -5,6 +5,7 @@
   import Select from '$lib/components/Select.svelte';
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
+  import DatePicker from '$lib/components/DatePicker.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import type { Equipment, EquipmentUpdate } from '$lib/modules/equipment/types';
   import { toasts } from '$lib/stores/toasts';
@@ -14,7 +15,18 @@
 
   const dispatch = createEventDispatcher<{ saved: Equipment }>();
 
-  let form: EquipmentUpdate & { name: string; brand: string; model: string; serial_number: string; manufacturer: string; status: string; risk_class: string; notes: string; acquisition_date: string; warranty_until: string };
+  let form = {
+    name: '',
+    brand: '',
+    model: '',
+    serial_number: '',
+    manufacturer: '',
+    status: 'operational' as Equipment['status'],
+    risk_class: '',
+    notes: '',
+    acquisition_date: '',
+    warranty_until: '',
+  };
   let saving = false;
 
   $: form = {
@@ -33,17 +45,17 @@
   async function save() {
     saving = true;
     try {
-      const payload = {
+      const payload: EquipmentUpdate = {
         name: form.name,
-        brand: form.brand || null,
-        model: form.model || null,
-        serial_number: form.serial_number || null,
-        manufacturer: form.manufacturer || null,
-        status: form.status as Equipment['status'],
-        risk_class: (form.risk_class || null) as Equipment['risk_class'],
-        notes: form.notes || null,
-        acquisition_date: form.acquisition_date || null,
-        warranty_until: form.warranty_until || null,
+        brand: form.brand || undefined,
+        model: form.model || undefined,
+        serial_number: form.serial_number || undefined,
+        manufacturer: form.manufacturer || undefined,
+        status: form.status,
+        risk_class: (form.risk_class || undefined) as 'I' | 'IIa' | 'IIb' | 'III' | undefined,
+        notes: form.notes || undefined,
+        acquisition_date: form.acquisition_date || undefined,
+        warranty_until: form.warranty_until || undefined,
       };
       const updated = await equipmentApi.update(equipment.id, payload);
       toasts.success('Equipo actualizado');
@@ -84,8 +96,8 @@
         { value: 'III', label: 'III' },
       ]}
     />
-    <Input label="Adquirido" type="date" bind:value={form.acquisition_date} />
-    <Input label="Garantía hasta" type="date" bind:value={form.warranty_until} />
+    <DatePicker label="Adquirido" bind:value={form.acquisition_date} />
+    <DatePicker label="Garantía hasta" bind:value={form.warranty_until} />
     <div class="sm:col-span-2">
       <Textarea label="Notas" bind:value={form.notes} rows={3} />
     </div>

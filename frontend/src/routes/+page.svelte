@@ -9,6 +9,8 @@
   });
 </script>
 
+<script lang="ts" context="module"></script>
+
 <div class="grid min-h-screen place-items-center">
-  <p class="text-slate-500">Cargando…</p>
+  <span class="h-10 w-10 animate-spin rounded-full border-[3px] border-slate-200 border-t-brand-600"></span>
 </div>

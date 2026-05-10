@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Bamesoft — Biomedical Asset Management & Engineering Software (API)"
 readme = "README.md"
 requires-python = ">=3.11"
-authors = [{ name = "Avatarflower" }]
+authors = [{ name = "Bamesoft" }]
 dependencies = [
   "fastapi>=0.115",
   "uvicorn[standard]>=0.30",

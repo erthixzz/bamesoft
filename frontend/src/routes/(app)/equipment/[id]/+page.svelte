@@ -3,6 +3,7 @@
   import { page } from '$app/stores';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Spinner from '$lib/components/Spinner.svelte';
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
@@ -74,7 +75,7 @@
 </script>
 
 {#if loading}
-  <p class="text-slate-500">Cargando…</p>
+  <Spinner />
 {:else if error || !eq}
   <p class="text-danger-600">{error ?? 'No se encontró'}</p>
 {:else}
