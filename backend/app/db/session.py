@@ -14,13 +14,18 @@ from app.core.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
-    pool_pre_ping=True,
-    pool_size=5,
+    # Pool optimizado para Supabase Pooler remoto:
+    # - sin pre_ping (ahorra 1 roundtrip por request a la DB)
+    # - pool grande para no esperar por conexiones disponibles
+    # - reciclado generoso para reutilizar conexiones
+    pool_pre_ping=False,
+    pool_size=20,
     max_overflow=10,
-    # Supabase Pooler (PgBouncer) no soporta prepared statements persistentes;
-    # desactivamos el cache de asyncpg para evitar
-    # "connection was closed in the middle of operation".
+    pool_recycle=1800,
+    pool_timeout=10,
     connect_args={
+        # PgBouncer no soporta prepared statements persistentes:
+        # evita "connection was closed in the middle of operation".
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
     },
