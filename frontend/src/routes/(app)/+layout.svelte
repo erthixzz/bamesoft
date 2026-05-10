@@ -7,6 +7,7 @@
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Header from '$lib/components/Header.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
+  import AppBackdrop from '$lib/components/AppBackdrop.svelte';
 
   let bootError: string | null = null;
   let booting = true;
@@ -29,7 +30,9 @@
   });
 </script>
 
-<div class="flex min-h-screen">
+<AppBackdrop />
+
+<div class="relative flex min-h-screen">
   <Sidebar />
   <div class="flex w-full min-w-0 flex-col">
     <Header />

@@ -3,17 +3,28 @@
   import Card from '$lib/components/Card.svelte';
   import Badge from '$lib/components/Badge.svelte';
   import Button from '$lib/components/Button.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
+  import Spinner from '$lib/components/Spinner.svelte';
   import { alertsApi } from '$lib/modules/alerts/api';
   import type { Alert } from '$lib/modules/alerts/types';
   import { formatDate, timeFromNow } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
+  import { AlertTriangle, BellRing, PlusCircle, Sparkles } from 'lucide-svelte';
 
   let rows: Alert[] = [];
   let loading = false;
+  let firstLoad = true;
 
   async function load() {
-    rows = await alertsApi.list();
+    loading = true;
+    try {
+      rows = await alertsApi.list();
+    } finally {
+      loading = false;
+      firstLoad = false;
+    }
   }
 
   async function sweep() {
@@ -46,37 +57,58 @@
   });
 </script>
 
-<div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-  <Button variant="secondary" on:click={sweep} {loading}>Generar automáticas</Button>
-  <a class="btn-primary text-center" href="/alerts/new">+ Nueva alerta</a>
-</div>
+<PageHeader title="Alertas" subtitle="Vencimientos de mantenimiento, calibraciones y SLAs" icon={AlertTriangle} gradient="rose">
+  <svelte:fragment slot="actions">
+    <Button variant="secondary" on:click={sweep} {loading}>
+      <Sparkles class="h-4 w-4" /> Generar automáticas
+    </Button>
+    <a class="btn-primary" href="/alerts/new">
+      <PlusCircle class="h-4 w-4" /> Nueva alerta
+    </a>
+  </svelte:fragment>
+</PageHeader>
 
-<div class="grid gap-3">
-  {#each rows as a}
-    <Card>
-      <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div class="min-w-0 flex-1">
-          <div class="flex flex-wrap items-center gap-2">
-            <Badge tone={tone(a.severity)}>{a.severity}</Badge>
-            <span class="text-xs uppercase text-slate-500">{a.type}</span>
+{#if loading && firstLoad}
+  <Card><Spinner label="Cargando alertas…" /></Card>
+{:else if rows.length === 0}
+  <Card>
+    <EmptyState
+      icon={BellRing}
+      title="Sin alertas activas"
+      description="Cuando un equipo tenga mantenimiento o calibración por vencer, aparecerá aquí. Puedes generar las automáticas o crear una manual."
+    >
+      <svelte:fragment slot="actions">
+        <Button variant="secondary" on:click={sweep}>Generar automáticas</Button>
+        <a class="btn-primary" href="/alerts/new">+ Nueva alerta</a>
+      </svelte:fragment>
+    </EmptyState>
+  </Card>
+{:else}
+  <div class="grid gap-3">
+    {#each rows as a}
+      <Card>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+              <Badge tone={tone(a.severity)}>{a.severity}</Badge>
+              <span class="text-xs uppercase text-slate-500">{a.type}</span>
+            </div>
+            <p class="mt-1 font-medium">{a.title}</p>
+            <p class="text-sm text-slate-600">{a.message}</p>
+            <p class="mt-1 text-xs text-slate-400">
+              {timeFromNow(a.created_at)} · vence {formatDate(a.due_at)}
+            </p>
           </div>
-          <p class="mt-1 font-medium">{a.title}</p>
-          <p class="text-sm text-slate-600">{a.message}</p>
-          <p class="mt-1 text-xs text-slate-400">
-            {timeFromNow(a.created_at)} · vence {formatDate(a.due_at)}
-          </p>
+          <div class="flex flex-wrap gap-2 sm:shrink-0">
+            {#if !a.acknowledged_at}
+              <Button variant="secondary" on:click={() => ack(a.id)}>Reconocer</Button>
+            {/if}
+            {#if !a.resolved_at}
+              <Button on:click={() => resolve(a.id)}>Resolver</Button>
+            {/if}
+          </div>
         </div>
-        <div class="flex flex-wrap gap-2 sm:shrink-0">
-          {#if !a.acknowledged_at}
-            <Button variant="secondary" on:click={() => ack(a.id)}>Reconocer</Button>
-          {/if}
-          {#if !a.resolved_at}
-            <Button on:click={() => resolve(a.id)}>Resolver</Button>
-          {/if}
-        </div>
-      </div>
-    </Card>
-  {:else}
-    <p class="text-slate-500">No hay alertas activas.</p>
-  {/each}
-</div>
+      </Card>
+    {/each}
+  </div>
+{/if}

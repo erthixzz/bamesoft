@@ -45,6 +45,11 @@ export async function login(email: string, password: string): Promise<void> {
 export async function logout(): Promise<void> {
   await supabase.auth.signOut();
   profile.set(null);
+  session.set(null);
+  // Forzamos un hard reload a /login para limpiar cualquier estado en memoria.
+  if (typeof window !== 'undefined') {
+    window.location.href = '/login';
+  }
 }
 
 export function currentToken(): string | undefined {

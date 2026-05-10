@@ -2,11 +2,16 @@
   import { onMount } from 'svelte';
   import Card from '$lib/components/Card.svelte';
   import Table from '$lib/components/Table.svelte';
+  import PageHeader from '$lib/components/PageHeader.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
+  import Spinner from '$lib/components/Spinner.svelte';
   import { standardsApi } from '$lib/modules/standards/api';
   import type { Standard } from '$lib/modules/standards/types';
   import { setPageTitle } from '$lib/stores/page';
+  import { BookOpen } from 'lucide-svelte';
 
   let rows: Standard[] = [];
+  let loading = true;
   const columns = [
     { key: 'code', label: 'Código' },
     { key: 'name', label: 'Nombre' },
@@ -16,10 +21,22 @@
 
   onMount(async () => {
     setPageTitle('Normas');
-    rows = await standardsApi.list();
+    try {
+      rows = await standardsApi.list();
+    } finally {
+      loading = false;
+    }
   });
 </script>
 
+<PageHeader title="Normas" subtitle="Estándares aplicables a la operación clínica" icon={BookOpen} gradient="cyan" />
+
 <Card>
-  <Table {columns} {rows} />
+  {#if loading}
+    <Spinner label="Cargando normas…" />
+  {:else if rows.length === 0}
+    <EmptyState icon={BookOpen} title="Sin normas registradas" description="Agrega ISO 13485, IEC 60601, INVIMA, NTC u otras según apliquen." />
+  {:else}
+    <Table {columns} {rows} />
+  {/if}
 </Card>
