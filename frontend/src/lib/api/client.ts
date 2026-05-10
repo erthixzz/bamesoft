@@ -13,14 +13,16 @@ export class ApiError extends Error {
   }
 }
 
+type QueryParams = Record<string, unknown>;
+
 interface RequestOpts extends Omit<RequestInit, 'body' | 'headers'> {
   body?: unknown;
   headers?: Record<string, string>;
-  query?: Record<string, string | number | boolean | undefined | null>;
+  query?: QueryParams;
   isFormData?: boolean;
 }
 
-function buildUrl(path: string, query?: RequestOpts['query']): string {
+function buildUrl(path: string, query?: QueryParams): string {
   const url = new URL(path.startsWith('http') ? path : `${BASE_URL}${path}`);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
@@ -75,8 +77,8 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
 }
 
 export const api = {
-  get: <T>(path: string, query?: RequestOpts['query']) =>
-    request<T>(path, { method: 'GET', query }),
+  get: <T>(path: string, query?: object) =>
+    request<T>(path, { method: 'GET', query: query as QueryParams | undefined }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),
   put: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PUT', body }),
