@@ -15,9 +15,9 @@
       Powered by
       <span class="font-semibold text-slate-700">Bamesoft Solutions</span>
       &nbsp;·&nbsp;
-      <a class="hover:text-brand-700 hover:underline" href="#">Términos</a>
+      <a class="hover:text-brand-700 hover:underline" href="/terminos">Términos</a>
       &nbsp;·&nbsp;
-      <a class="hover:text-brand-700 hover:underline" href="#">Privacidad</a>
+      <a class="hover:text-brand-700 hover:underline" href="/privacidad">Privacidad</a>
     </footer>
   </div>
 </div>
