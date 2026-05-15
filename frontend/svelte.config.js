@@ -6,7 +6,10 @@ const config = {
   preprocess: vitePreprocess(),
 
   kit: {
-    adapter: adapter(),
+    adapter: adapter({
+      // Node 22: WebSocket global para Supabase Realtime en SSR. Requiere explícito; sin esto el adaptador solo acepta 18/20 al hacer build.
+      runtime: 'nodejs22.x',
+    }),
 
     alias: {
       $lib: './src/lib',
