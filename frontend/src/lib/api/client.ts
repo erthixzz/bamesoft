@@ -54,11 +54,18 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
     body = JSON.stringify(opts.body);
   }
 
-  const res = await fetch(buildUrl(path, opts.query), {
-    ...opts,
-    headers,
-    body,
-  });
+  const url = buildUrl(path, opts.query);
+  const { query: _q, isFormData: _fd, headers: _hIn, body: _bIn, ...fetchOpts } = opts;
+  const init: RequestInit = { ...fetchOpts, headers, body };
+
+  let res: Response;
+  try {
+    res = await fetch(url, init);
+  } catch {
+    // Render cold start / red: primer intento a veces falla sin respuesta CORS
+    await new Promise((r) => setTimeout(r, 2000));
+    res = await fetch(url, init);
+  }
 
   if (!res.ok) {
     let detail: unknown = await res.text();
