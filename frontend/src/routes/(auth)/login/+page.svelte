@@ -1,10 +1,12 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import { login } from '$lib/stores/auth';
   import { toasts } from '$lib/stores/toasts';
-  import { ArrowRight, ShieldCheck } from 'lucide-svelte';
+  import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-svelte';
 
   let email = '';
   let password = '';
@@ -29,15 +31,29 @@
 
 <div class="grid w-full max-w-5xl items-center gap-10 lg:grid-cols-[1.2fr_1fr]">
   <!-- HERO: título gigante con degradado + tagline -->
-  <section class="text-center lg:text-left">
-    <p class="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur">
+  <section
+    class="text-center lg:text-left"
+    in:fly={{ y: 24, duration: 600, delay: 80, easing: cubicOut }}
+  >
+    <!-- Volver a la landing -->
+    <a
+      href="/"
+      class="group mb-5 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3.5 py-1.5 text-xs font-semibold text-slate-600 shadow-sm backdrop-blur transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
+    >
+      <ArrowLeft class="h-3.5 w-3.5 transition group-hover:-translate-x-0.5" />
+      Volver al inicio
+    </a>
+
+    <p class="mb-3 inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white/70 px-3 py-1 text-xs font-medium uppercase tracking-wider text-slate-600 shadow-sm backdrop-blur lg:flex lg:w-fit">
       <span class="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_2px_rgba(16,185,129,0.6)]"></span>
       Bienvenido a
     </p>
 
-    <h1 class="bm-title text-[3.5rem] font-extrabold leading-[1.05] tracking-tight sm:text-7xl lg:text-[5.5rem]">
-      Bamesoft
-    </h1>
+    <a href="/" class="block" aria-label="Volver al inicio de Bamesoft">
+      <h1 class="bm-title text-[3.5rem] font-extrabold leading-[1.05] tracking-tight transition-transform hover:scale-[1.01] sm:text-7xl lg:text-[5.5rem]">
+        Bamesoft
+      </h1>
+    </a>
 
     <p class="mt-4 max-w-xl text-lg font-medium text-slate-700 sm:text-xl">
       Ingeniería biomédica
@@ -65,7 +81,7 @@
   </section>
 
   <!-- LOGIN CARD glassmorphism -->
-  <section>
+  <section in:fly={{ y: 24, duration: 600, delay: 180, easing: cubicOut }}>
     <form
       on:submit={onSubmit}
       class="relative rounded-2xl border border-white/60 bg-white/70 p-6 shadow-xl shadow-slate-900/5 backdrop-blur-xl"
@@ -74,9 +90,13 @@
       <div class="pointer-events-none absolute -inset-px -z-10 rounded-2xl bg-gradient-to-br from-brand-500/30 via-cyan-400/20 to-emerald-400/20 opacity-50 blur-xl"></div>
 
       <header class="mb-5 flex items-center gap-3">
-        <div class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-cyan-500 text-lg font-bold text-white shadow-md">
+        <a
+          href="/"
+          class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-cyan-500 text-lg font-bold text-white shadow-md transition hover:brightness-110 active:scale-95"
+          aria-label="Volver al inicio"
+        >
           B
-        </div>
+        </a>
         <div>
           <h2 class="text-base font-semibold text-slate-900">Iniciar sesión</h2>
           <p class="text-xs text-slate-500">Accede a tu suite biomédica</p>

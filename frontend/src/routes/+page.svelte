@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
+  import { fade } from 'svelte/transition';
   import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
   import { session } from '$lib/stores/auth';
@@ -160,7 +161,7 @@
   <div class="relative z-[1] bg-gradient-to-b from-slate-50 via-white to-slate-100/95">
     <AuthBackdrop />
 
-    <div class="relative z-10">
+    <div class="relative z-10" in:fade={{ duration: 450 }}>
       <!-- Header: logo | (nav escritorio + hamburguesa móvil + Entrar) -->
       <header
         class="landing-header sticky top-0 z-30 border-b border-slate-200 bg-white shadow-[0_4px_20px_rgba(15,23,42,0.07)] md:border-brand-200/40 md:bg-white/95 md:shadow-[0_8px_32px_-12px_rgba(25,113,245,0.18)] md:backdrop-blur-xl"
