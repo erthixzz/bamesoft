@@ -9,10 +9,11 @@
   import PriorityBadge from '$lib/modules/cases/components/PriorityBadge.svelte';
   import { casesApi } from '$lib/modules/cases/api';
   import type { Case } from '$lib/modules/cases/types';
+  import type { CtxItem } from '$lib/stores/contextMenu';
   import { formatDate } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
-  import { Wrench, PlusCircle } from 'lucide-svelte';
+  import { Wrench, PlusCircle, Eye, Copy } from 'lucide-svelte';
 
   let rows: Case[] = [];
   let loading = true;
@@ -35,6 +36,21 @@
       loading = false;
     }
   });
+
+  async function copy(text: string, label = 'Copiado') {
+    try {
+      await navigator.clipboard.writeText(text);
+      toasts.success(label);
+    } catch {
+      toasts.error('No se pudo copiar');
+    }
+  }
+
+  const rowMenu = (row: Case): CtxItem[] => [
+    { label: 'Ver detalle', icon: Eye, href: `/cases/${row.id}` },
+    { divider: true },
+    { label: 'Copiar código', icon: Copy, onClick: () => copy(row.code, 'Código copiado') },
+  ];
 </script>
 
 <PageHeader title="Casos" subtitle="Tickets de mantenimiento, calibración e inspección" icon={Wrench} gradient="amber">
@@ -59,7 +75,7 @@
       </svelte:fragment>
     </EmptyState>
   {:else}
-    <Table {columns} {rows}>
+    <Table {columns} {rows} {rowMenu}>
       <svelte:fragment slot="cell" let:row let:column>
         {#if column === 'status'}
           <CaseStatusBadge status={row.status} />

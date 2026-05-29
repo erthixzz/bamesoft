@@ -8,6 +8,7 @@
   import Header from '$lib/components/Header.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
   import AppBackdrop from '$lib/components/AppBackdrop.svelte';
+  import ContextMenu from '$lib/components/ContextMenu.svelte';
 
   let bootError: string | null = null;
   let booting = true;
@@ -31,6 +32,7 @@
 </script>
 
 <AppBackdrop />
+<ContextMenu />
 
 <div class="relative flex min-h-screen">
   <Sidebar />

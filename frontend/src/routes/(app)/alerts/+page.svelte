@@ -8,10 +8,12 @@
   import Spinner from '$lib/components/Spinner.svelte';
   import { alertsApi } from '$lib/modules/alerts/api';
   import type { Alert } from '$lib/modules/alerts/types';
+  import type { CtxItem } from '$lib/stores/contextMenu';
+  import { contextmenu } from '$lib/actions/contextmenu';
   import { formatDate, timeFromNow } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
-  import { AlertTriangle, BellRing, PlusCircle, Sparkles } from 'lucide-svelte';
+  import { AlertTriangle, BellRing, PlusCircle, Sparkles, Check, CheckCheck, Copy } from 'lucide-svelte';
 
   let rows: Alert[] = [];
   let loading = false;
@@ -51,6 +53,26 @@
     return sev === 'critical' ? 'red' : sev === 'warning' ? 'yellow' : 'blue';
   }
 
+  async function copy(text: string, label = 'Copiado') {
+    try {
+      await navigator.clipboard.writeText(text);
+      toasts.success(label);
+    } catch {
+      toasts.error('No se pudo copiar');
+    }
+  }
+
+  const rowMenu = (a: Alert): CtxItem[] => [
+    ...(!a.acknowledged_at
+      ? [{ label: 'Reconocer', icon: Check, onClick: () => ack(a.id) } as CtxItem]
+      : []),
+    ...(!a.resolved_at
+      ? [{ label: 'Resolver', icon: CheckCheck, onClick: () => resolve(a.id) } as CtxItem]
+      : []),
+    { divider: true },
+    { label: 'Copiar mensaje', icon: Copy, onClick: () => copy(a.message, 'Mensaje copiado') },
+  ];
+
   onMount(() => {
     setPageTitle('Alertas');
     load();
@@ -86,6 +108,7 @@
 {:else}
   <div class="grid gap-3">
     {#each rows as a}
+      <div use:contextmenu={rowMenu(a)} class="cursor-context-menu">
       <Card>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 flex-1">
@@ -109,6 +132,7 @@
           </div>
         </div>
       </Card>
+      </div>
     {/each}
   </div>
 {/if}

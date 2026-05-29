@@ -38,6 +38,8 @@
   onMount(async () => {
     try {
       eq = await equipmentApi.get(id);
+      // Abre el modal de edición si se llegó con ?edit=1 (desde el menú contextual).
+      if ($page.url.searchParams.get('edit') === '1') editOpen = true;
       [cases, cals, pms, docs] = await Promise.all([
         casesApi.list({ equipment_id: id }),
         calibrationsApi.forEquipment(id),

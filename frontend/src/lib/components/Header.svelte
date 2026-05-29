@@ -18,16 +18,20 @@
     <h1 class="truncate text-sm font-semibold text-slate-900 sm:text-base">{$pageTitle}</h1>
   </div>
 
-  <div class="flex shrink-0 items-center gap-2 sm:gap-4">
+  <div class="flex shrink-0 items-center gap-2 sm:gap-3">
     {#if $profile?.clinic_name}
-      <div class="hidden items-center gap-2 rounded-lg bg-slate-100 px-3 py-1.5 lg:flex">
-        <Building2 class="h-4 w-4 text-slate-500" />
-        <span class="max-w-[200px] truncate text-sm font-medium text-slate-700">{$profile.clinic_name}</span>
+      <div
+        class="hidden items-center gap-2 rounded-full border border-brand-200/80 bg-gradient-to-r from-brand-50 to-cyan-50 py-1 pl-1.5 pr-3 shadow-sm md:flex"
+      >
+        <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-cyan-500 text-white shadow-sm">
+          <Building2 class="h-3.5 w-3.5" />
+        </span>
+        <span class="max-w-[180px] truncate text-sm font-semibold text-brand-800">{$profile.clinic_name}</span>
       </div>
     {/if}
     {#if $profile}
       <div class="hidden text-right sm:block">
-        <p class="max-w-[160px] truncate text-sm font-medium leading-tight">{$profile.full_name}</p>
+        <p class="max-w-[160px] truncate text-sm font-semibold leading-tight text-slate-900">{$profile.full_name}</p>
         <p class="text-xs text-slate-500">{ROLE_LABELS[$profile.role]}</p>
       </div>
       <div

@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { goto } from '$app/navigation';
   import Table from '$lib/components/Table.svelte';
   import Input from '$lib/components/Input.svelte';
   import Card from '$lib/components/Card.svelte';
@@ -9,10 +10,11 @@
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import type { Equipment } from '$lib/modules/equipment/types';
+  import type { CtxItem } from '$lib/stores/contextMenu';
   import { formatDate } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
-  import { QrCode, Search, PlusCircle } from 'lucide-svelte';
+  import { QrCode, Search, PlusCircle, Eye, Pencil, Copy, RefreshCw } from 'lucide-svelte';
 
   let rows: Equipment[] = [];
   let q = '';
@@ -37,6 +39,32 @@
       loading = false;
     }
   }
+
+  async function copy(text: string, label = 'Copiado') {
+    try {
+      await navigator.clipboard.writeText(text);
+      toasts.success(label);
+    } catch {
+      toasts.error('No se pudo copiar');
+    }
+  }
+
+  async function regenerateQr(row: Equipment) {
+    try {
+      await equipmentApi.regenerateQr(row.id);
+      toasts.success(`QR regenerado para ${row.code}`);
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Error regenerando QR');
+    }
+  }
+
+  const rowMenu = (row: Equipment): CtxItem[] => [
+    { label: 'Ver detalle', icon: Eye, href: `/equipment/${row.id}` },
+    { label: 'Editar', icon: Pencil, href: `/equipment/${row.id}?edit=1` },
+    { divider: true },
+    { label: 'Copiar código', icon: Copy, onClick: () => copy(row.code, 'Código copiado') },
+    { label: 'Regenerar QR', icon: RefreshCw, onClick: () => regenerateQr(row) },
+  ];
 
   onMount(() => {
     setPageTitle('Equipos');
@@ -73,7 +101,7 @@
       </svelte:fragment>
     </EmptyState>
   {:else}
-    <Table {columns} {rows}>
+    <Table {columns} {rows} {rowMenu}>
       <svelte:fragment slot="cell" let:row let:column>
         {#if column === 'status'}
           <StatusBadge status={row.status} />
