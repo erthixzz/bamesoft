@@ -120,5 +120,5 @@ async def qr_png(
     _: User = Depends(require_authenticated),
 ):
     obj = await service.get_equipment(db, equipment_id)
-    payload = qr.build_payload(obj.code, obj.qr_token)
-    return Response(content=qr.render_png(payload), media_type="image/png")
+    url = qr.build_url(obj.code, obj.qr_token)
+    return Response(content=qr.render_png(url), media_type="image/png")

@@ -29,9 +29,26 @@ export const equipmentApi = {
   categories: () => api.get<EquipmentCategory[]>('/equipment/categories'),
 };
 
-/** Parsea el payload escaneado y devuelve {code, token}. */
+/**
+ * Parsea el contenido del QR y devuelve {code, token}.
+ * Acepta el nuevo formato URL (`.../e/{code}?t={token}`) y el JSON antiguo.
+ */
 export function parseQrPayload(raw: string): { code: string; token: string } {
-  const data = JSON.parse(raw) as { v?: number; code?: string; token?: string };
+  const text = raw.trim();
+
+  // Nuevo formato: URL
+  if (text.startsWith('http://') || text.startsWith('https://')) {
+    const url = new URL(text);
+    const parts = url.pathname.split('/').filter(Boolean);
+    const token = url.searchParams.get('t');
+    const code =
+      parts.length >= 2 && parts[parts.length - 2] === 'e' ? parts[parts.length - 1] : null;
+    if (!code || !token) throw new Error('QR no reconocido');
+    return { code: decodeURIComponent(code), token };
+  }
+
+  // Formato antiguo: JSON
+  const data = JSON.parse(text) as { v?: number; code?: string; token?: string };
   if (data.v !== 1 || !data.code || !data.token) {
     throw new Error('QR no reconocido');
   }

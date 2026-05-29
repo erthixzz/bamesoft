@@ -1,14 +1,17 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
+  import { browser } from '$app/environment';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
-  import { Pencil, FileUp } from 'lucide-svelte';
+  import { Pencil, FileUp, Copy, ExternalLink, Download } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
+  import { publicQrPngUrl } from '$lib/modules/public/api';
+  import { toasts } from '$lib/stores/toasts';
   import { casesApi } from '$lib/modules/cases/api';
   import { calibrationsApi } from '$lib/modules/calibrations/api';
   import { maintenanceApi } from '$lib/modules/maintenance/api';
@@ -57,6 +60,21 @@
     eq = e.detail;
   }
 
+  // Enlace público que codifica el QR (mismo origen que esta app).
+  $: publicUrl =
+    eq && browser
+      ? `${window.location.origin}/e/${encodeURIComponent(eq.code)}?t=${encodeURIComponent(eq.qr_token)}`
+      : '';
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(publicUrl);
+      toasts.success('Enlace público copiado');
+    } catch {
+      toasts.error('No se pudo copiar');
+    }
+  }
+
   async function onFile(e: Event) {
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
@@ -102,9 +120,32 @@
       </dl>
     </Card>
 
-    <Card title="QR">
-      <img alt="QR" src={equipmentApi.qrPngUrl(eq.id)} class="mx-auto h-40 w-40" />
-      <p class="mt-2 break-all text-center text-xs text-slate-500">token: {eq.qr_token}</p>
+    <Card title="QR público">
+      <img
+        alt={`QR de ${eq.code}`}
+        src={publicQrPngUrl(eq.code, eq.qr_token)}
+        class="mx-auto h-44 w-44 rounded-lg border border-slate-100"
+      />
+      <p class="mt-3 text-center text-xs text-slate-500">
+        Escanéalo con la cámara del teléfono para ver la ficha pública del equipo.
+      </p>
+      <div class="mt-3 flex flex-wrap justify-center gap-2">
+        <button class="btn-secondary" on:click={copyLink}>
+          <Copy class="h-4 w-4" /> Copiar enlace
+        </button>
+        <a class="btn-secondary" href={publicUrl} target="_blank" rel="noopener">
+          <ExternalLink class="h-4 w-4" /> Abrir
+        </a>
+        <a
+          class="btn-secondary"
+          href={publicQrPngUrl(eq.code, eq.qr_token)}
+          target="_blank"
+          rel="noopener"
+          download={`qr-${eq.code}.png`}
+        >
+          <Download class="h-4 w-4" /> Descargar
+        </a>
+      </div>
     </Card>
 
     <Card title="Notas">

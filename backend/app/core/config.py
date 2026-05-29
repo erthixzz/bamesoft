@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     APP_DEBUG: bool = True
     APP_VERSION: str = "0.1.0"
 
+    # URL pública del frontend (a la que apunta el QR de cada equipo).
+    PUBLIC_APP_URL: str = "http://localhost:5173"
+
     # DB
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/bamesoft"
