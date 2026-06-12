@@ -11,6 +11,7 @@ from app.db.enums import EquipmentStatus
 from app.db.session import get_session
 from app.modules.auth.deps import require_authenticated, require_engineer
 from app.modules.equipment import qr, service
+from app.modules.equipment.life_sheet_schemas import LifeSheetOut, LifeSheetUpdate
 from app.modules.equipment.schemas import (
     EquipmentCategoryOut,
     EquipmentCreate,
@@ -107,6 +108,27 @@ async def regenerate_qr_token(
     _: User = Depends(require_engineer),
 ):
     return await service.regenerate_qr(db, equipment_id)
+
+
+@router.get("/{equipment_id}/life-sheet", response_model=LifeSheetOut)
+async def get_life_sheet(
+    equipment_id: uuid.UUID,
+    db: AsyncSession = Depends(get_session),
+    _: User = Depends(require_authenticated),
+):
+    """Hoja de vida del equipo (consulta). Si no existe, devuelve vacía."""
+    return await service.get_life_sheet(db, equipment_id)
+
+
+@router.put("/{equipment_id}/life-sheet", response_model=LifeSheetOut)
+async def save_life_sheet(
+    equipment_id: uuid.UUID,
+    payload: LifeSheetUpdate,
+    db: AsyncSession = Depends(get_session),
+    _: User = Depends(require_engineer),
+):
+    """Crea/actualiza la hoja de vida y sincroniza los campos del equipo."""
+    return await service.upsert_life_sheet(db, equipment_id, payload)
 
 
 @router.get(

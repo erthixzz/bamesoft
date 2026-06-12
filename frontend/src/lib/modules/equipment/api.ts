@@ -6,6 +6,7 @@ import type {
   EquipmentCreate,
   EquipmentUpdate,
 } from './types';
+import type { LifeSheet, LifeSheetUpdate } from './lifeSheet';
 
 export interface ListParams {
   clinic_id?: string;
@@ -27,6 +28,9 @@ export const equipmentApi = {
   regenerateQr: (id: string) => api.post<Equipment>(`/equipment/${id}/regenerate-qr`),
   qrPngUrl: (id: string) => `/api/v1/equipment/${id}/qr.png`,
   categories: () => api.get<EquipmentCategory[]>('/equipment/categories'),
+  getLifeSheet: (id: string) => api.get<LifeSheet>(`/equipment/${id}/life-sheet`),
+  saveLifeSheet: (id: string, payload: LifeSheetUpdate) =>
+    api.put<LifeSheet>(`/equipment/${id}/life-sheet`, payload),
 };
 
 /**

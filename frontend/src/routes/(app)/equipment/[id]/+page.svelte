@@ -8,7 +8,7 @@
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
-  import { Pencil, FileUp, Copy, ExternalLink, Download } from 'lucide-svelte';
+  import { Pencil, FileUp, Copy, ExternalLink, Download, FileText } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { publicQrPngUrl } from '$lib/modules/public/api';
   import { toasts } from '$lib/stores/toasts';
@@ -100,6 +100,9 @@
   <p class="text-danger-600">{error ?? 'No se encontró'}</p>
 {:else}
   <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
+    <a class="btn-secondary text-center" href={`/equipment/${eq.id}/hoja-de-vida`}>
+      <FileText class="h-4 w-4" /> Hoja de vida
+    </a>
     <a class="btn-secondary text-center" href={`/cases/new?equipment_id=${eq.id}`}>+ Caso para este equipo</a>
     <Button on:click={() => (editOpen = true)}>
       <Pencil class="h-4 w-4" /> Editar

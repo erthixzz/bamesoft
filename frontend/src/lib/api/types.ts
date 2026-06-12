@@ -46,6 +46,7 @@ export type DocumentType =
   | 'report'
   | 'standard'
   | 'invoice'
+  | 'life_sheet'
   | 'other';
 
 export interface Paginated<T> {

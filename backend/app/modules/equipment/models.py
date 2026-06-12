@@ -6,7 +6,7 @@ from datetime import date
 from typing import TYPE_CHECKING
 
 from sqlalchemy import Date, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -88,6 +88,35 @@ class Equipment(Base, UUIDPrimaryKey, Timestamps):
     standards: Mapped[list["EquipmentStandard"]] = relationship(
         back_populates="equipment", cascade="all, delete-orphan"
     )
+    life_sheet: Mapped["EquipmentLifeSheet | None"] = relationship(
+        back_populates="equipment", uselist=False, cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Equipment {self.code} {self.name!r}>"
+
+
+class EquipmentLifeSheet(Base, UUIDPrimaryKey, Timestamps):
+    """Hoja de Vida del equipo (formato clínico MNT-FR-023).
+
+    El cuerpo del formato se guarda en `data` (JSONB) validado por Pydantic en
+    la API; los campos compartidos (código, marca, serial, clínica, garantía…)
+    se reutilizan desde la fila de `equipment`, no se duplican aquí.
+    """
+
+    __tablename__ = "equipment_life_sheets"
+
+    equipment_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("equipment.id", ondelete="CASCADE"),
+        unique=True,
+        nullable=False,
+        index=True,
+    )
+    formato_codigo: Mapped[str] = mapped_column(
+        String(64), nullable=False, default="MNT-FR-023"
+    )
+    formato_fecha: Mapped[str | None] = mapped_column(String(64))
+    data: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
+
+    equipment: Mapped["Equipment"] = relationship(back_populates="life_sheet")

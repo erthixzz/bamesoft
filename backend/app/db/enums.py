@@ -73,4 +73,5 @@ class DocumentType(StrEnum):
     REPORT = "report"
     STANDARD = "standard"
     INVOICE = "invoice"
+    LIFE_SHEET = "life_sheet"
     OTHER = "other"

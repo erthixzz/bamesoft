@@ -27,7 +27,7 @@ backend/        FastAPI · SQLAlchemy · Pydantic v2 · Alembic
 frontend/       SvelteKit · TypeScript · Tailwind · QR (jsQR)
 infra/
   supabase/     migraciones SQL, RLS, seeds
-docs/           arquitectura, modelo de datos, roles, API
+docs/           arquitectura, modelo de datos, roles, API, hoja de vida
 .github/        CI workflows
 ```
 
@@ -85,6 +85,7 @@ supabase db reset
 - [Modelo de datos](docs/data-model.md)
 - [Roles y permisos](docs/roles.md)
 - [API](docs/api.md)
+- [Hoja de Vida de Equipo Biomédico](docs/hoja-de-vida.md) — formato `MNT-FR-023` (referencia del antiguo `ASPIRADOR.pdf`, ya eliminado)
 
 ---
 
