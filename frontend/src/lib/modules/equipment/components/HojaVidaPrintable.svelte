@@ -85,10 +85,17 @@
         </div>
       </div>
     </div>
-    <div style="text-align:right;padding:10px 12px;border-left:1px solid #cbd5e1;min-width:160px;">
-      <div><strong>Código:</strong> {txt(sheet.formato_codigo)}</div>
-      <div><strong>Fecha:</strong> {txt(sheet.formato_fecha)}</div>
-      <div style="margin-top:2px;font-size:9px;color:#64748b;">Generado con Bamesoft</div>
+    <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding:10px 12px;border-left:1px solid #cbd5e1;min-width:210px;">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="height:36px;width:36px;border-radius:9px;background:linear-gradient(135deg,#1971f5,#06b6d4);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 1px 4px rgba(15,23,42,.2);">B</div>
+        <div style="line-height:1.05;text-align:left;">
+          <div style="font-size:20px;font-weight:900;letter-spacing:-.02em;color:#0f172a;">Bamesoft</div>
+          <div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#1971f5;">Biomedical Software</div>
+        </div>
+      </div>
+      <div style="font-size:10px;color:#475569;text-align:right;">
+        <strong>Código:</strong> {txt(sheet.formato_codigo)} · <strong>Fecha:</strong> {txt(sheet.formato_fecha)}
+      </div>
     </div>
   </div>
 
@@ -210,7 +217,9 @@
     {/if}
   </div>
 
-  <div style="margin-top:10px;text-align:center;font-size:9px;color:#94a3b8;">
-    Información protegida · Bamesoft Solutions
+  <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#1971f5,#06b6d4);color:#ffffff;border-radius:10px;padding:11px 16px;">
+    <div style="height:24px;width:24px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;">B</div>
+    <span style="font-size:14px;font-weight:800;letter-spacing:.02em;">Generado con Bamesoft Solutions</span>
+    <span style="font-size:11px;opacity:.9;">· Información protegida</span>
   </div>
 </div>
