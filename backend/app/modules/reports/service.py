@@ -6,6 +6,8 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.enums import CaseStatus
+from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
 from app.modules.reports.schemas import ComplianceItem, ComplianceReport, DashboardKPIs
 from app.modules.standards.models import EquipmentStandard, Standard
@@ -45,6 +47,15 @@ async def dashboard(db: AsyncSession) -> DashboardKPIs:
     avg_seconds = row.avg_close_seconds
     avg_hours = float(avg_seconds) / 3600.0 if avg_seconds else None
 
+    # Desglose de casos por estado (todos los estados, con 0 si no hay).
+    status_rows = (
+        await db.execute(select(Case.status, func.count()).group_by(Case.status))
+    ).all()
+    cases_by_status = {s.value: 0 for s in CaseStatus}
+    for st, cnt in status_rows:
+        key = st.value if isinstance(st, CaseStatus) else str(st)
+        cases_by_status[key] = cnt
+
     return DashboardKPIs(
         equipment_total=row.eq_total or 0,
         equipment_operational=row.eq_op or 0,
@@ -55,6 +66,7 @@ async def dashboard(db: AsyncSession) -> DashboardKPIs:
         preventive_due_30d=row.pm_due or 0,
         calibrations_due_30d=row.cal_due or 0,
         avg_close_time_hours=avg_hours,
+        cases_by_status=cases_by_status,
     )
 
 

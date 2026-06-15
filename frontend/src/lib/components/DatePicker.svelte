@@ -4,7 +4,9 @@
    *  Valor enlazado: ISO YYYY-MM-DD o YYYY-MM-DDTHH:MM.
    */
   import { onMount } from 'svelte';
-  import { Calendar, ChevronLeft, ChevronRight, X } from 'lucide-svelte';
+  import { Calendar, ChevronLeft, ChevronRight, Clock, X } from 'lucide-svelte';
+  import { tooltip } from '$lib/actions/tooltip';
+  import { portal } from '$lib/actions/portal';
 
   export let label = '';
   export let value: string = ''; // YYYY-MM-DD o YYYY-MM-DDTHH:MM
@@ -16,9 +18,25 @@
 
   let open = false;
   let containerEl: HTMLDivElement;
+  let triggerEl: HTMLButtonElement;
+  let popupEl: HTMLDivElement;
+  let popTop = 0;
+  let popLeft = 0;
   let viewYear: number;
   let viewMonth: number; // 0-11
   let timeStr = '08:00';
+
+  const POP_W = 320;
+  const POP_H = 360; // alto aproximado para decidir arriba/abajo
+
+  function positionPopup() {
+    if (!triggerEl) return;
+    const r = triggerEl.getBoundingClientRect();
+    const spaceBelow = window.innerHeight - r.bottom;
+    // Si no cabe abajo pero sí arriba, lo mostramos encima del campo.
+    popTop = spaceBelow < POP_H + 12 && r.top > POP_H ? r.top - POP_H - 8 : r.bottom + 6;
+    popLeft = Math.max(8, Math.min(r.left, window.innerWidth - POP_W - 8));
+  }
 
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const MONTHS = [
@@ -116,9 +134,7 @@
   }
 
   function applyTime() {
-    if (!parsed) return;
-    const iso = `${parsed.y}-${pad(parsed.m + 1)}-${pad(parsed.d)}`;
-    value = `${iso}T${timeStr}`;
+    applyLive();
     open = false;
   }
 
@@ -141,24 +157,52 @@
   }
 
   function toggle() {
-    if (!open) initView();
+    if (!open) {
+      initView();
+      positionPopup();
+    }
     open = !open;
   }
 
-  function onDocClick(e: MouseEvent) {
-    if (open && containerEl && !containerEl.contains(e.target as Node)) open = false;
+  // Hora (modo datetime) — listas de selección.
+  function pad2(n: number): string {
+    return String(n).padStart(2, '0');
+  }
+  const HOURS = Array.from({ length: 24 }, (_, i) => i);
+  const MINUTES = Array.from({ length: 12 }, (_, i) => i * 5); // paso de 5
+  $: [th, tm] = (timeStr || '08:00').split(':').map(Number);
+
+  /** Aplica la hora al valor en vivo (si ya hay día elegido o usando hoy). */
+  function applyLive() {
+    const t = new Date();
+    const base = parsed ?? { y: t.getFullYear(), m: t.getMonth(), d: t.getDate() };
+    value = `${base.y}-${pad(base.m + 1)}-${pad(base.d)}T${timeStr}`;
+  }
+  function setH(h: number) {
+    timeStr = `${pad2(h)}:${pad2(tm)}`;
+    applyLive();
+  }
+  function setM(m: number) {
+    timeStr = `${pad2(th)}:${pad2(m)}`;
+    applyLive();
   }
 
   function onKey(e: KeyboardEvent) {
     if (e.key === 'Escape') open = false;
   }
 
+  function onReposition() {
+    if (open) positionPopup(); // reposicionar (no cerrar) al hacer scroll/resize
+  }
+
   onMount(() => {
-    window.addEventListener('mousedown', onDocClick);
     window.addEventListener('keydown', onKey);
+    window.addEventListener('scroll', onReposition, true);
+    window.addEventListener('resize', onReposition);
     return () => {
-      window.removeEventListener('mousedown', onDocClick);
       window.removeEventListener('keydown', onKey);
+      window.removeEventListener('scroll', onReposition, true);
+      window.removeEventListener('resize', onReposition);
     };
   });
 </script>
@@ -170,6 +214,7 @@
 
   <button
     type="button"
+    bind:this={triggerEl}
     class="input flex w-full items-center justify-between gap-2 text-left {value ? 'text-slate-800' : 'text-slate-400'}"
     on:click={toggle}
     aria-haspopup="dialog"
@@ -182,6 +227,7 @@
           type="button"
           class="text-slate-400 hover:text-slate-700"
           on:click|stopPropagation={clear}
+          use:tooltip={{ text: 'Limpiar', placement: 'bottom' }}
           aria-label="Limpiar"
           tabindex="-1"
         >
@@ -202,10 +248,21 @@
   {/if}
 
   {#if open}
-    <div
-      class="absolute left-0 z-50 mt-2 w-[320px] rounded-xl border border-slate-200 bg-white p-3 shadow-xl"
-      role="dialog"
-    >
+    <div use:portal>
+      <!-- Backdrop transparente: cierra al click fuera (z-index inline, sin depender de JIT) -->
+      <button
+        type="button"
+        class="fixed inset-0 cursor-default"
+        style="z-index:9998;"
+        aria-label="Cerrar calendario"
+        on:click={() => (open = false)}
+      ></button>
+      <div
+        bind:this={popupEl}
+        class="fixed max-h-[88vh] w-[320px] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 shadow-2xl"
+        style="top:{popTop}px; left:{popLeft}px; z-index:9999;"
+        role="dialog"
+      >
       <header class="mb-2 flex items-center justify-between">
         <button type="button" class="rounded-md p-1 text-slate-500 hover:bg-slate-100" on:click={prevMonth} aria-label="Mes anterior">
           <ChevronLeft class="h-4 w-4" />
@@ -229,11 +286,15 @@
           {@const disabled = isBefore(cell.date, min)}
           <button
             type="button"
-            class="grid h-9 place-items-center rounded-lg text-sm transition
-              {!cell.current ? 'text-slate-300' : 'text-slate-700 hover:bg-brand-50'}
-              {selected ? '!bg-brand-600 !text-white' : ''}
-              {today && !selected ? 'ring-1 ring-brand-300' : ''}
-              {disabled ? 'cursor-not-allowed opacity-40 hover:!bg-transparent' : ''}"
+            class="grid h-9 place-items-center rounded-lg text-sm font-medium transition
+              {selected
+                ? 'bg-brand-600 font-bold text-white shadow-md ring-2 ring-brand-300 hover:bg-brand-700'
+                : !cell.current
+                  ? 'text-slate-300 hover:bg-slate-50'
+                  : today
+                    ? 'text-brand-700 ring-1 ring-brand-300 hover:bg-brand-50'
+                    : 'text-slate-700 hover:bg-brand-50'}
+              {disabled ? 'cursor-not-allowed opacity-40 hover:bg-transparent' : ''}"
             disabled={disabled}
             on:click={() => selectDate(cell.date)}
           >
@@ -243,16 +304,43 @@
       </div>
 
       {#if mode === 'datetime'}
-        <div class="mt-3 flex items-center gap-2 border-t border-slate-100 pt-3">
-          <span class="text-sm text-slate-500">Hora</span>
-          <input
-            type="time"
-            class="input flex-1"
-            bind:value={timeStr}
-          />
-          <button type="button" class="btn-primary" on:click={applyTime} disabled={!parsed}>
-            OK
-          </button>
+        <div class="mt-3 border-t border-slate-100 pt-3">
+          <div class="mb-2 flex items-center gap-1.5 text-sm font-medium text-slate-600">
+            <Clock class="h-4 w-4 text-brand-500" /> Hora
+            <span class="ml-auto rounded-md bg-brand-50 px-2 py-0.5 text-sm font-bold tabular-nums text-brand-700">
+              {pad2(th)}:{pad2(tm)}
+            </span>
+          </div>
+          <div class="flex items-stretch justify-center gap-1.5">
+            <!-- Columna de horas -->
+            <div class="h-[152px] w-[68px] overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-1">
+              {#each HOURS as h}
+                <button
+                  type="button"
+                  class="block w-full rounded-md px-2 py-1.5 text-center text-sm tabular-nums transition
+                    {h === th ? 'bg-brand-600 font-semibold text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"
+                  on:click={() => setH(h)}
+                >
+                  {pad2(h)}
+                </button>
+              {/each}
+            </div>
+            <div class="flex items-center text-xl font-bold text-slate-300">:</div>
+            <!-- Columna de minutos -->
+            <div class="h-[152px] w-[68px] overflow-y-auto rounded-lg border border-slate-200 bg-slate-50/50 p-1">
+              {#each MINUTES as m}
+                <button
+                  type="button"
+                  class="block w-full rounded-md px-2 py-1.5 text-center text-sm tabular-nums transition
+                    {m === tm ? 'bg-brand-600 font-semibold text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-900'}"
+                  on:click={() => setM(m)}
+                >
+                  {pad2(m)}
+                </button>
+              {/each}
+            </div>
+          </div>
+          <button type="button" class="btn-primary mt-3 w-full" on:click={applyTime}>OK</button>
         </div>
       {/if}
 
@@ -267,6 +355,7 @@
           Cerrar
         </button>
       </footer>
+      </div>
     </div>
   {/if}
 </div>

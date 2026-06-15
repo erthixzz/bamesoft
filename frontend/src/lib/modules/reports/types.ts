@@ -8,6 +8,7 @@ export interface DashboardKPIs {
   preventive_due_30d: number;
   calibrations_due_30d: number;
   avg_close_time_hours: number | null;
+  cases_by_status?: Record<string, number>;
 }
 
 export interface ComplianceItem {

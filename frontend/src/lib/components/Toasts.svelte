@@ -2,6 +2,7 @@
   import { toasts, type ToastKind } from '$lib/stores/toasts';
   import { fly } from 'svelte/transition';
   import { CheckCircle2, AlertCircle, Info, AlertTriangle, X } from 'lucide-svelte';
+  import { tooltip } from '$lib/actions/tooltip';
 
   type IconType = typeof CheckCircle2;
   const palette: Record<ToastKind, { bar: string; Icon: IconType; iconCls: string }> = {
@@ -25,6 +26,7 @@
       <button
         class="text-slate-400 transition hover:text-slate-700"
         on:click={() => toasts.dismiss(t.id)}
+        use:tooltip={{ text: 'Cerrar', placement: 'left' }}
         aria-label="Cerrar"
       >
         <X class="h-4 w-4" />

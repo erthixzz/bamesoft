@@ -86,13 +86,19 @@
     return { total, segs };
   })();
 
-  // ---- Barras: casos por estado ----
+  // ---- Barras: casos por estado (todos los estados) ----
+  const CASE_STATUS_META = [
+    { key: 'open', label: 'Abiertos', color: 'from-amber-400 to-amber-600' },
+    { key: 'assigned', label: 'Asignados', color: 'from-sky-400 to-sky-600' },
+    { key: 'in_progress', label: 'En progreso', color: 'from-brand-400 to-brand-600' },
+    { key: 'waiting_parts', label: 'Esp. repuestos', color: 'from-orange-400 to-orange-600' },
+    { key: 'waiting_client', label: 'Esp. cliente', color: 'from-purple-400 to-purple-600' },
+    { key: 'closed', label: 'Cerrados', color: 'from-emerald-400 to-emerald-600' },
+    { key: 'cancelled', label: 'Cancelados', color: 'from-slate-300 to-slate-500' },
+  ];
   $: caseBars = (() => {
-    const items = [
-      { label: 'Abiertos', value: kpis?.cases_open ?? 0, color: 'from-amber-400 to-amber-600' },
-      { label: 'En progreso', value: kpis?.cases_in_progress ?? 0, color: 'from-brand-400 to-brand-600' },
-      { label: 'Cerrados 30d', value: kpis?.cases_closed_30d ?? 0, color: 'from-emerald-400 to-emerald-600' },
-    ];
+    const by = kpis?.cases_by_status ?? {};
+    const items = CASE_STATUS_META.map((m) => ({ ...m, value: by[m.key] ?? 0 }));
     const max = Math.max(1, ...items.map((i) => i.value));
     return items.map((i) => ({ ...i, h: (i.value / max) * 100 * a, display: Math.round(i.value * a) }));
   })();
@@ -272,17 +278,17 @@
         <h3 class="text-base font-semibold text-slate-900">Casos por estado</h3>
       </header>
 
-      <div class="flex h-32 items-end justify-around gap-4 px-2">
+      <div class="flex h-36 items-end justify-around gap-1.5 px-1">
         {#each caseBars as b}
-          <div class="flex h-full flex-1 flex-col items-center justify-end gap-2">
-            <span class="text-sm font-bold tabular-nums text-slate-900">{b.display}</span>
-            <div class="flex w-full max-w-[3.5rem] flex-1 items-end">
+          <div class="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
+            <span class="text-xs font-bold tabular-nums text-slate-900">{b.display}</span>
+            <div class="flex w-full max-w-[2.25rem] flex-1 items-end">
               <div
                 class="w-full rounded-t-lg bg-gradient-to-t {b.color}"
                 style="height:{b.h}%; min-height:4px"
               ></div>
             </div>
-            <span class="text-center text-[11px] font-medium leading-tight text-slate-500">{b.label}</span>
+            <span class="text-center text-[9px] font-medium leading-tight text-slate-500">{b.label}</span>
           </div>
         {/each}
       </div>

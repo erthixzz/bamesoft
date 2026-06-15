@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class DashboardKPIs(BaseModel):
@@ -13,6 +13,8 @@ class DashboardKPIs(BaseModel):
     preventive_due_30d: int
     calibrations_due_30d: int
     avg_close_time_hours: float | None = None
+    # Conteo de casos por cada estado (open, assigned, in_progress, …).
+    cases_by_status: dict[str, int] = Field(default_factory=dict)
 
 
 class ComplianceItem(BaseModel):
