@@ -3,6 +3,8 @@
   import { afterNavigate } from '$app/navigation';
   import { sidebarOpen, closeSidebar } from '$lib/stores/sidebar';
   import { fly, fade } from 'svelte/transition';
+  import { tooltip } from '$lib/actions/tooltip';
+  import CaseLegendModal from '$lib/modules/cases/components/CaseLegendModal.svelte';
   import {
     LayoutDashboard,
     Wrench,
@@ -13,8 +15,11 @@
     BarChart3,
     Users,
     Settings,
+    HelpCircle,
     X,
   } from 'lucide-svelte';
+
+  let legendOpen = false;
 
   const items = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -35,15 +40,15 @@
 </script>
 
 <!-- Sidebar fijo en desktop (md+) -->
-<aside class="hidden w-64 shrink-0 border-r border-slate-200 bg-white md:block">
-  <div class="flex h-16 items-center gap-2 px-5">
+<aside class="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+  <div class="flex h-16 shrink-0 items-center gap-2 px-5">
     <div class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 font-bold text-white">B</div>
     <div>
       <p class="text-sm font-semibold leading-tight">Bamesoft</p>
       <p class="text-xs text-slate-500">Biomedical Suite</p>
     </div>
   </div>
-  <nav class="space-y-1 px-3 py-2">
+  <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2">
     {#each items as item}
       {@const active = current === item.href || current.startsWith(item.href + '/')}
       <a
@@ -56,6 +61,26 @@
       </a>
     {/each}
   </nav>
+
+  <!-- Footer: branding + ayuda -->
+  <div class="shrink-0 border-t border-slate-100 p-3">
+    <div class="flex items-center gap-2.5 rounded-xl bg-slate-50 p-2.5">
+      <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 text-sm font-bold text-white shadow-sm">B</div>
+      <div class="min-w-0 flex-1">
+        <p class="truncate text-xs font-semibold text-slate-700">Bamesoft Solutions</p>
+        <p class="truncate text-[10px] text-slate-400">Ingeniería biomédica</p>
+      </div>
+      <button
+        type="button"
+        class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-brand-50 hover:text-brand-600"
+        on:click={() => (legendOpen = true)}
+        use:tooltip={{ text: 'Guía: estados y prioridades', placement: 'top' }}
+        aria-label="Ayuda: estados y prioridades de casos"
+      >
+        <HelpCircle class="h-5 w-5" />
+      </button>
+    </div>
+  </div>
 </aside>
 
 <!-- Drawer móvil (md:hidden) -->
@@ -71,10 +96,10 @@
   ></div>
 
   <aside
-    class="fixed left-0 top-0 z-50 h-screen w-72 max-w-[80vw] border-r border-slate-200 bg-white shadow-2xl md:hidden"
+    class="fixed left-0 top-0 z-50 flex h-screen w-72 max-w-[80vw] flex-col border-r border-slate-200 bg-white shadow-2xl md:hidden"
     transition:fly={{ x: -288, duration: 220 }}
   >
-    <div class="flex h-16 items-center justify-between gap-2 px-5">
+    <div class="flex h-16 shrink-0 items-center justify-between gap-2 px-5">
       <div class="flex items-center gap-2">
         <div class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 font-bold text-white">B</div>
         <div>
@@ -86,7 +111,7 @@
         <X class="h-5 w-5" />
       </button>
     </div>
-    <nav class="space-y-1 px-3 py-2">
+    <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2">
       {#each items as item}
         {@const active = current === item.href || current.startsWith(item.href + '/')}
         <a
@@ -99,5 +124,26 @@
         </a>
       {/each}
     </nav>
+
+    <!-- Footer: branding + ayuda -->
+    <div class="shrink-0 border-t border-slate-100 p-3">
+      <div class="flex items-center gap-2.5 rounded-xl bg-slate-50 p-2.5">
+        <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 text-sm font-bold text-white shadow-sm">B</div>
+        <div class="min-w-0 flex-1">
+          <p class="truncate text-xs font-semibold text-slate-700">Bamesoft Solutions</p>
+          <p class="truncate text-[10px] text-slate-400">Ingeniería biomédica</p>
+        </div>
+        <button
+          type="button"
+          class="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 transition hover:bg-brand-50 hover:text-brand-600"
+          on:click={() => (legendOpen = true)}
+          aria-label="Ayuda: estados y prioridades de casos"
+        >
+          <HelpCircle class="h-5 w-5" />
+        </button>
+      </div>
+    </div>
   </aside>
 {/if}
+
+<CaseLegendModal bind:open={legendOpen} />

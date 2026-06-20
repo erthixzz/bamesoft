@@ -3,46 +3,86 @@
   import { tweened } from 'svelte/motion';
   import { cubicOut } from 'svelte/easing';
   import { fly } from 'svelte/transition';
+  import { flip } from 'svelte/animate';
   import Card from '$lib/components/Card.svelte';
-  import { reportsApi } from '$lib/modules/reports/api';
-  import type { DashboardKPIs, ComplianceReport } from '$lib/modules/reports/types';
+  import Select from '$lib/components/Select.svelte';
+  import Spinner from '$lib/components/Spinner.svelte';
+  import EmptyState from '$lib/components/EmptyState.svelte';
+  import CaseBoardCard from '$lib/modules/cases/components/CaseBoardCard.svelte';
+  import CaseEditModal from '$lib/modules/cases/components/CaseEditModal.svelte';
+  import CaseLegendModal from '$lib/modules/cases/components/CaseLegendModal.svelte';
+  import { casesApi } from '$lib/modules/cases/api';
+  import type { Case } from '$lib/modules/cases/types';
+  import { equipmentApi } from '$lib/modules/equipment/api';
+  import { usersApi } from '$lib/modules/users/api';
+  import type { User } from '$lib/modules/users/types';
+  import {
+    PRIORITY_META,
+    STATUS_GROUPS,
+    STATUS_GROUP_OPTIONS,
+    PRIORITY_OPTIONS,
+    isActive,
+    isAging,
+    slaInfo,
+  } from '$lib/modules/cases/ui';
+  import type { CasePriority } from '$lib/api/types';
+  import { tooltip } from '$lib/actions/tooltip';
   import { setPageTitle } from '$lib/stores/page';
   import { profile } from '$lib/stores/auth';
   import {
-    Wrench,
-    AlertTriangle,
-    Activity,
-    CheckCircle2,
     QrCode,
-    BarChart3,
-    Clock,
     PlusCircle,
-    ArrowRight,
     Building2,
-    ShieldCheck,
-    PieChart,
+    LayoutGrid,
+    Search,
+    Wrench,
+    Activity,
+    UserMinus,
+    AlarmClock,
+    Timer,
+    BarChart3,
+    SignalHigh,
+    HelpCircle,
   } from 'lucide-svelte';
 
-  let kpis: DashboardKPIs | null = null;
-  let compliance: ComplianceReport | null = null;
+  let cases: Case[] = [];
+  let engineers: User[] = [];
+  let equipmentNameById: Record<string, string> = {};
+  let loading = true;
   let error: string | null = null;
 
-  // Una sola tween 0→1 que dirige todas las animaciones (contadores, dona, barras).
-  const anim = tweened(0, { duration: 1400, easing: cubicOut });
+  // Filtros
+  let fStatusGroup = '';
+  let fAssignee = '';
+  let fPriority = '';
+  let search = '';
+
+  // Modales
+  let editOpen = false;
+  let editCase: Case | null = null;
+  let legendOpen = false;
+
+  const anim = tweened(0, { duration: 1000, easing: cubicOut });
+  $: a = $anim;
 
   onMount(async () => {
     setPageTitle('Dashboard');
     try {
-      kpis = await reportsApi.dashboard();
+      const [cs, us, eq] = await Promise.all([
+        casesApi.list({ limit: 200 }),
+        usersApi.list().catch(() => [] as User[]),
+        equipmentApi.list({ limit: 300 }).catch(() => []),
+      ]);
+      cases = cs;
+      engineers = us.filter(
+        (u) => u.active !== false && ['admin', 'engineer', 'service', 'support'].includes(u.role),
+      );
+      equipmentNameById = Object.fromEntries(eq.map((e) => [e.id, `${e.code} · ${e.name}`]));
       anim.set(1);
     } catch (e) {
-      error = e instanceof Error ? e.message : 'Error cargando KPIs';
-    }
-    // El cumplimiento es opcional: si falla, simplemente no mostramos esa gráfica.
-    try {
-      compliance = await reportsApi.compliance();
-    } catch {
-      /* opcional */
+      error = e instanceof Error ? e.message : 'Error cargando el panel';
+    } finally {
+      loading = false;
     }
   });
 
@@ -53,321 +93,338 @@
     return 'Buenas noches';
   }
 
-  // Valores animados (cuentan hacia arriba con $anim).
-  $: a = $anim;
-  $: cu = (v: number | null | undefined) => Math.round((v ?? 0) * a);
+  // Reemplaza un caso tras un cambio en línea o en el modal (dispara reactividad).
+  function upsert(updated: Case) {
+    cases = cases.map((c) => (c.id === updated.id ? updated : c));
+  }
+  function openEdit(c: Case) {
+    editCase = c;
+    editOpen = true;
+  }
 
-  // ---- Dona: estado de equipos ----
-  const DONUT_C = 2 * Math.PI * 52; // circunferencia (r = 52)
-  $: donut = (() => {
-    const total = kpis?.equipment_total ?? 0;
-    const op = kpis?.equipment_operational ?? 0;
-    const out = kpis?.equipment_out_of_service ?? 0;
-    const other = Math.max(0, total - op - out);
-    const raw = [
-      { label: 'Operativos', value: op, color: '#10b981' },
-      { label: 'Fuera de servicio', value: out, color: '#f43f5e' },
-      { label: 'Otros estados', value: other, color: '#94a3b8' },
-    ].filter((s) => s.value > 0);
+  // ---- KPIs (todo derivado de `cases` → en tiempo real) ----
+  $: activeCases = cases.filter(isActive);
+  $: kActive = activeCases.length;
+  $: kInProgress = cases.filter((c) => c.status === 'in_progress').length;
+  $: kUnassigned = activeCases.filter((c) => !c.assigned_to).length;
+  $: kSlaRisk = activeCases.filter((c) => {
+    const s = slaInfo(c).state;
+    return s === 'overdue' || s === 'soon';
+  }).length;
 
-    let acc = 0;
-    const segs = raw.map((s) => {
-      const frac = total ? s.value / total : 0;
-      const seg = {
-        ...s,
-        frac,
-        dash: frac * DONUT_C * a,
-        offset: -acc * DONUT_C * a,
-        pct: Math.round(frac * 100),
-      };
-      acc += frac;
-      return seg;
-    });
-    return { total, segs };
-  })();
+  // Tiempo prom. de cierre (live): media de (closed_at − opened_at) de los casos
+  // cerrados en los últimos 30 días. 0 si no hay ninguno.
+  $: closedRecent = cases.filter(
+    (c) =>
+      c.status === 'closed' &&
+      c.opened_at &&
+      c.closed_at &&
+      (Date.now() - new Date(c.closed_at).getTime()) / 86_400_000 <= 30,
+  );
+  $: avgClose = closedRecent.length
+    ? closedRecent.reduce(
+        (s, c) => s + (new Date(c.closed_at!).getTime() - new Date(c.opened_at!).getTime()) / 3_600_000,
+        0,
+      ) / closedRecent.length
+    : 0;
 
-  // ---- Barras: casos por estado (todos los estados) ----
-  const CASE_STATUS_META = [
-    { key: 'open', label: 'Abiertos', color: 'from-amber-400 to-amber-600' },
-    { key: 'assigned', label: 'Asignados', color: 'from-sky-400 to-sky-600' },
-    { key: 'in_progress', label: 'En progreso', color: 'from-brand-400 to-brand-600' },
-    { key: 'waiting_parts', label: 'Esp. repuestos', color: 'from-orange-400 to-orange-600' },
-    { key: 'waiting_client', label: 'Esp. cliente', color: 'from-purple-400 to-purple-600' },
-    { key: 'closed', label: 'Cerrados', color: 'from-emerald-400 to-emerald-600' },
-    { key: 'cancelled', label: 'Cancelados', color: 'from-slate-300 to-slate-500' },
+  $: kpiCards = [
+    { icon: Activity, label: 'Casos activos', value: kActive, tone: 'brand', sub: `${cases.length} en total` },
+    { icon: Wrench, label: 'En progreso', value: kInProgress, tone: 'amber', sub: 'siendo atendidos' },
+    {
+      icon: UserMinus,
+      label: 'Sin asignar',
+      value: kUnassigned,
+      tone: kUnassigned > 0 ? 'rose' : 'emerald',
+      sub: kUnassigned > 0 ? 'requieren ingeniero' : 'todo asignado',
+    },
+    {
+      icon: AlarmClock,
+      label: 'SLA en riesgo',
+      value: kSlaRisk,
+      tone: kSlaRisk > 0 ? 'rose' : 'emerald',
+      sub: kSlaRisk > 0 ? 'vencidos o por vencer' : 'al día',
+    },
   ];
-  $: caseBars = (() => {
-    const by = kpis?.cases_by_status ?? {};
-    const items = CASE_STATUS_META.map((m) => ({ ...m, value: by[m.key] ?? 0 }));
-    const max = Math.max(1, ...items.map((i) => i.value));
-    return items.map((i) => ({ ...i, h: (i.value / max) * 100 * a, display: Math.round(i.value * a) }));
-  })();
+
+  const TONES: Record<string, string> = {
+    brand: 'bg-brand-50 text-brand-600',
+    amber: 'bg-amber-50 text-amber-600',
+    rose: 'bg-rose-50 text-rose-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+  };
+
+  // ---- Gráfica: casos por estado (agrupado, sin ceros) ----
+  $: byStatus = STATUS_GROUPS.map((g) => ({
+    ...g,
+    value: cases.filter((c) => g.statuses.includes(c.status)).length,
+  })).filter((g) => g.value > 0);
+  $: statusMax = Math.max(1, ...byStatus.map((s) => s.value));
+
+  // ---- Gráfica: por prioridad ----
+  $: byPriority = (Object.keys(PRIORITY_META) as CasePriority[])
+    .slice()
+    .reverse()
+    .map((key) => ({ key, ...PRIORITY_META[key], value: cases.filter((c) => c.priority === key).length }));
+  $: prioTotal = Math.max(1, byPriority.reduce((acc, p) => acc + p.value, 0));
+
+  // ---- Filtrado + orden por urgencia ----
+  function urgency(c: Case): number {
+    let score = isActive(c) ? 1000 : 0;
+    const s = slaInfo(c).state;
+    if (s === 'overdue') score += 500;
+    else if (s === 'soon') score += 200;
+    if (isAging(c)) score += 100;
+    score += PRIORITY_META[c.priority].rank * 10;
+    return score;
+  }
+
+  $: activeGroupStatuses = STATUS_GROUPS.find((g) => g.key === fStatusGroup)?.statuses ?? null;
+  $: filtered = cases
+    .filter((c) => {
+      if (activeGroupStatuses && !activeGroupStatuses.includes(c.status)) return false;
+      if (fPriority && c.priority !== fPriority) return false;
+      if (fAssignee === '__unassigned__') {
+        if (c.assigned_to) return false;
+      } else if (fAssignee && c.assigned_to !== fAssignee) return false;
+      if (search.trim()) {
+        const q = search.trim().toLowerCase();
+        const hay = `${c.code} ${c.title} ${equipmentNameById[c.equipment_id] ?? ''}`.toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    })
+    .sort((x, y) => urgency(y) - urgency(x));
+
+  $: assigneeFilterOptions = [
+    { value: '__unassigned__', label: '— Sin asignar —' },
+    ...engineers.map((u) => ({ value: u.id, label: u.full_name })),
+  ];
+
+  $: hasFilters = !!(fStatusGroup || fAssignee || fPriority || search.trim());
+  function clearFilters() {
+    fStatusGroup = '';
+    fAssignee = '';
+    fPriority = '';
+    search = '';
+  }
 </script>
 
-<!-- HERO de bienvenida -->
+<!-- HERO slim -->
 <div
-  in:fly={{ y: 18, duration: 600, easing: cubicOut }}
-  class="mb-3 overflow-hidden rounded-2xl border border-white/60 bg-gradient-to-br from-brand-600 via-brand-500 to-cyan-500 p-4 text-white shadow-lg sm:mb-4 sm:p-5"
+  in:fly={{ y: 14, duration: 450, easing: cubicOut }}
+  class="relative mb-3 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-slate-900 via-brand-800 to-brand-600 px-4 py-3 text-white shadow-lg sm:px-5"
 >
-  <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <div
+    class="pointer-events-none absolute inset-0 opacity-[0.15]"
+    style="background-image:linear-gradient(to right,rgba(255,255,255,.4) 1px,transparent 1px),linear-gradient(to bottom,rgba(255,255,255,.4) 1px,transparent 1px);background-size:30px 30px"
+  ></div>
+  <div class="pointer-events-none absolute -right-16 -top-20 h-52 w-52 rounded-full bg-cyan-400/20 blur-3xl"></div>
+
+  <div class="relative flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
-      <p class="text-xs font-semibold uppercase tracking-wider text-white/80">{greeting()}</p>
-      <h1 class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-xl font-bold sm:text-2xl">
+      <p class="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-white/70">
+        <SignalHigh class="h-3.5 w-3.5" /> {greeting()} · Centro de casos
+      </p>
+      <h1 class="flex flex-wrap items-center gap-x-2 gap-y-1 text-lg font-bold leading-tight sm:text-xl">
         <span class="truncate">{$profile?.full_name ?? 'Bienvenido'}</span>
         {#if $profile?.clinic_name}
-          <span
-            class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-1 pl-1.5 pr-2.5 text-xs font-semibold ring-1 ring-white/25 backdrop-blur"
-          >
-            <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white/25">
-              <Building2 class="h-2.5 w-2.5" />
-            </span>
+          <span class="inline-flex max-w-full items-center gap-1.5 rounded-full bg-white/15 py-0.5 pl-1.5 pr-2.5 text-xs font-semibold ring-1 ring-white/25 backdrop-blur">
+            <span class="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-white/25"><Building2 class="h-2.5 w-2.5" /></span>
             <span class="truncate">{$profile.clinic_name}</span>
           </span>
         {/if}
       </h1>
     </div>
     <div class="flex flex-wrap gap-2">
-      <a
-        class="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3.5 py-2 text-sm font-medium backdrop-blur transition hover:bg-white/20"
-        href="/equipment/scan"
-      >
+      <a class="inline-flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-medium backdrop-blur transition hover:bg-white/20" href="/equipment/scan">
         <QrCode class="h-4 w-4" /> Escanear QR
       </a>
-      <a
-        class="inline-flex items-center gap-2 rounded-lg bg-white px-3.5 py-2 text-sm font-medium text-brand-700 shadow-sm transition hover:bg-slate-50"
-        href="/cases/new"
-      >
+      <a class="inline-flex items-center gap-2 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-brand-700 shadow-sm transition hover:bg-slate-50" href="/cases/new">
         <PlusCircle class="h-4 w-4" /> Nuevo caso
       </a>
     </div>
   </div>
 </div>
 
-<!-- KPIs principales -->
-<div class="grid gap-3 sm:grid-cols-2 sm:gap-4 lg:grid-cols-4">
-  <div in:fly={{ y: 16, duration: 500, delay: 80, easing: cubicOut }}>
-    <Card>
-      <div class="flex items-start gap-3">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600">
-          <Activity class="h-5 w-5" />
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs uppercase tracking-wider text-slate-500">Equipos</p>
-          <p class="text-2xl font-bold tabular-nums text-slate-900">{kpis ? cu(kpis.equipment_total) : '—'}</p>
-          <p class="truncate text-xs text-slate-500">
-            <span class="text-emerald-600">{cu(kpis?.equipment_operational)} operativos</span>
-            <span class="text-slate-400"> · </span>
-            <span class="text-rose-600">{cu(kpis?.equipment_out_of_service)} fuera</span>
-          </p>
-        </div>
-      </div>
-    </Card>
-  </div>
-
-  <div in:fly={{ y: 16, duration: 500, delay: 150, easing: cubicOut }}>
-    <Card>
-      <div class="flex items-start gap-3">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-50 text-amber-600">
-          <Wrench class="h-5 w-5" />
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs uppercase tracking-wider text-slate-500">Casos abiertos</p>
-          <p class="text-2xl font-bold tabular-nums text-slate-900">
-            {cu((kpis?.cases_open ?? 0) + (kpis?.cases_in_progress ?? 0))}
-          </p>
-          <p class="truncate text-xs text-slate-500">
-            {cu(kpis?.cases_open)} abiertos · {cu(kpis?.cases_in_progress)} en progreso
-          </p>
-        </div>
-      </div>
-    </Card>
-  </div>
-
-  <div in:fly={{ y: 16, duration: 500, delay: 220, easing: cubicOut }}>
-    <Card>
-      <div class="flex items-start gap-3">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-yellow-50 text-yellow-600">
-          <AlertTriangle class="h-5 w-5" />
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs uppercase tracking-wider text-slate-500">Mant. preventivo (30d)</p>
-          <p class="text-2xl font-bold tabular-nums text-slate-900">{cu(kpis?.preventive_due_30d)}</p>
-          <p class="truncate text-xs text-slate-500">por vencer</p>
-        </div>
-      </div>
-    </Card>
-  </div>
-
-  <div in:fly={{ y: 16, duration: 500, delay: 290, easing: cubicOut }}>
-    <Card>
-      <div class="flex items-start gap-3">
-        <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-emerald-50 text-emerald-600">
-          <CheckCircle2 class="h-5 w-5" />
-        </div>
-        <div class="min-w-0">
-          <p class="text-xs uppercase tracking-wider text-slate-500">Calibraciones (30d)</p>
-          <p class="text-2xl font-bold tabular-nums text-slate-900">{cu(kpis?.calibrations_due_30d)}</p>
-          <p class="truncate text-xs text-slate-500">por vencer</p>
-        </div>
-      </div>
-    </Card>
-  </div>
-</div>
-
 {#if error}
-  <p class="mt-4 text-sm text-danger-600">{error}</p>
+  <p class="mb-3 rounded-lg border border-danger-500 bg-red-50 p-3 text-sm text-danger-600">{error}</p>
 {/if}
 
-<!-- GRÁFICAS -->
-<div class="mt-3 grid gap-3 sm:mt-4 sm:gap-4 lg:grid-cols-3">
-  <!-- Dona: estado de equipos -->
-  <div in:fly={{ y: 16, duration: 500, delay: 360, easing: cubicOut }}>
+<!-- KPIs (en tiempo real) -->
+<div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
+  {#each kpiCards as kpi, i (kpi.label)}
+    <div in:fly={{ y: 12, duration: 400, delay: 50 + i * 60, easing: cubicOut }}>
+      <Card>
+        <div class="flex items-start gap-3">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl {TONES[kpi.tone]}">
+            <svelte:component this={kpi.icon} class="h-5 w-5" />
+          </div>
+          <div class="min-w-0">
+            <p class="text-xs uppercase tracking-wider text-slate-500">{kpi.label}</p>
+            <p class="text-2xl font-bold tabular-nums text-slate-900">{Math.round(kpi.value * a)}</p>
+            <p class="truncate text-xs text-slate-400">{kpi.sub}</p>
+          </div>
+        </div>
+      </Card>
+    </div>
+  {/each}
+</div>
+
+<!-- Layout principal: casos (izq) + gráficas (der) -->
+<div class="mt-3 grid gap-3 lg:grid-cols-3">
+  <!-- CENTRO DE CASOS -->
+  <div in:fly={{ y: 14, duration: 450, delay: 200, easing: cubicOut }} class="lg:col-span-2">
     <Card>
-      <header class="mb-4 flex items-center gap-2">
-        <PieChart class="h-4 w-4 text-brand-600" />
-        <h3 class="text-base font-semibold text-slate-900">Estado de equipos</h3>
+      <header class="mb-4 flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div class="flex items-center gap-2">
+          <LayoutGrid class="h-4 w-4 text-brand-600" />
+          <h3 class="text-base font-semibold text-slate-900">Casos</h3>
+          <span class="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold tabular-nums text-slate-600">
+            {filtered.length}{hasFilters ? ` / ${cases.length}` : ''}
+          </span>
+          <button
+            type="button"
+            class="grid h-6 w-6 place-items-center rounded-lg text-slate-400 transition hover:bg-brand-50 hover:text-brand-600"
+            on:click={() => (legendOpen = true)}
+            use:tooltip={{ text: 'Guía: estados y prioridades', placement: 'top' }}
+            aria-label="Guía de estados"
+          >
+            <HelpCircle class="h-4 w-4" />
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <label class="relative col-span-2 sm:col-span-1">
+            <Search class="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input class="input pl-8" placeholder="Buscar…" bind:value={search} aria-label="Buscar caso" />
+          </label>
+          <Select bind:value={fStatusGroup} options={STATUS_GROUP_OPTIONS} placeholder="Estado" />
+          <Select bind:value={fAssignee} options={assigneeFilterOptions} placeholder="Ingeniero" />
+          <Select bind:value={fPriority} options={PRIORITY_OPTIONS} placeholder="Prioridad" />
+        </div>
+        {#if hasFilters}
+          <button type="button" class="self-start text-xs font-medium text-slate-500 hover:text-brand-600" on:click={clearFilters}>
+            Limpiar filtros
+          </button>
+        {/if}
       </header>
 
-      {#if donut.total === 0}
-        <p class="py-8 text-center text-sm text-slate-400">Sin equipos registrados aún.</p>
+      {#if loading}
+        <Spinner label="Cargando casos…" />
+      {:else if cases.length === 0}
+        <EmptyState
+          icon={Wrench}
+          title="Aún no hay casos"
+          description="Crea el primer caso para reportar una falla, programar un mantenimiento o registrar una calibración."
+        >
+          <svelte:fragment slot="actions">
+            <a class="btn-primary" href="/cases/new">+ Crear caso</a>
+          </svelte:fragment>
+        </EmptyState>
+      {:else if filtered.length === 0}
+        <div class="py-10 text-center">
+          <p class="text-sm text-slate-500">Ningún caso coincide con los filtros.</p>
+          <button type="button" class="mt-2 text-sm font-medium text-brand-600 hover:underline" on:click={clearFilters}>Quitar filtros</button>
+        </div>
       {:else}
-        <div class="flex items-center gap-5">
-          <div class="relative h-32 w-32 shrink-0">
-            <svg viewBox="0 0 120 120" class="h-full w-full -rotate-90">
-              <circle cx="60" cy="60" r="52" fill="none" stroke="#f1f5f9" stroke-width="14" />
-              {#each donut.segs as s}
-                <circle
-                  cx="60"
-                  cy="60"
-                  r="52"
-                  fill="none"
-                  stroke={s.color}
-                  stroke-width="14"
-                  stroke-linecap="round"
-                  stroke-dasharray="{s.dash} {DONUT_C}"
-                  stroke-dashoffset={s.offset}
-                />
-              {/each}
-            </svg>
-            <div class="absolute inset-0 flex flex-col items-center justify-center">
-              <span class="text-2xl font-bold tabular-nums text-slate-900">{cu(donut.total)}</span>
-              <span class="text-[10px] uppercase tracking-wider text-slate-500">equipos</span>
+        <div class="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
+          {#each filtered as c (c.id)}
+            <div animate:flip={{ duration: 250, easing: cubicOut }}>
+              <CaseBoardCard
+                {c}
+                equipmentName={equipmentNameById[c.equipment_id] ?? ''}
+                {engineers}
+                on:changed={(e) => upsert(e.detail)}
+                on:edit={(e) => openEdit(e.detail)}
+              />
             </div>
-          </div>
-
-          <ul class="min-w-0 flex-1 space-y-2">
-            {#each donut.segs as s}
-              <li class="flex items-center gap-2 text-sm">
-                <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{s.color}"></span>
-                <span class="min-w-0 flex-1 truncate text-slate-600">{s.label}</span>
-                <span class="shrink-0 font-semibold tabular-nums text-slate-900">{s.value}</span>
-                <span class="shrink-0 text-xs text-slate-400">({s.pct}%)</span>
-              </li>
-            {/each}
-          </ul>
+          {/each}
         </div>
       {/if}
     </Card>
   </div>
 
-  <!-- Barras: casos por estado -->
-  <div in:fly={{ y: 16, duration: 500, delay: 430, easing: cubicOut }}>
+  <!-- COLUMNA DE GRÁFICAS -->
+  <div in:fly={{ y: 14, duration: 450, delay: 280, easing: cubicOut }} class="space-y-3">
+    <!-- Casos por estado -->
     <Card>
-      <header class="mb-4 flex items-center gap-2">
+      <header class="mb-3 flex items-center gap-2">
         <BarChart3 class="h-4 w-4 text-brand-600" />
-        <h3 class="text-base font-semibold text-slate-900">Casos por estado</h3>
+        <h3 class="text-sm font-semibold text-slate-900">Casos por estado</h3>
       </header>
+      {#if byStatus.length === 0}
+        <p class="py-4 text-center text-xs text-slate-400">Sin casos registrados.</p>
+      {:else}
+        <div class="space-y-2.5">
+          {#each byStatus as s}
+            <button
+              type="button"
+              class="flex w-full items-center gap-2 text-left"
+              class:opacity-40={fStatusGroup && fStatusGroup !== s.key}
+              on:click={() => (fStatusGroup = fStatusGroup === s.key ? '' : s.key)}
+              use:tooltip={{ text: fStatusGroup === s.key ? `Quitar filtro: ${s.label}` : `Filtrar por ${s.label}`, placement: 'left' }}
+            >
+              <span class="h-2.5 w-2.5 shrink-0 rounded-full" style="background:{s.color}"></span>
+              <span class="w-24 shrink-0 truncate text-xs font-medium text-slate-600">{s.label}</span>
+              <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+                <span class="block h-full rounded-full" style="width:{(s.value / statusMax) * 100 * a}%; background:{s.color}"></span>
+              </span>
+              <span class="w-6 shrink-0 text-right text-xs font-bold tabular-nums text-slate-900">{s.value}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </Card>
 
-      <div class="flex h-36 items-end justify-around gap-1.5 px-1">
-        {#each caseBars as b}
-          <div class="flex h-full flex-1 flex-col items-center justify-end gap-1.5">
-            <span class="text-xs font-bold tabular-nums text-slate-900">{b.display}</span>
-            <div class="flex w-full max-w-[2.25rem] flex-1 items-end">
-              <div
-                class="w-full rounded-t-lg bg-gradient-to-t {b.color}"
-                style="height:{b.h}%; min-height:4px"
-              ></div>
-            </div>
-            <span class="text-center text-[9px] font-medium leading-tight text-slate-500">{b.label}</span>
-          </div>
+    <!-- Por prioridad -->
+    <Card>
+      <header class="mb-3 flex items-center gap-2">
+        <SignalHigh class="h-4 w-4 text-brand-600" />
+        <h3 class="text-sm font-semibold text-slate-900">Por prioridad</h3>
+      </header>
+      <div class="space-y-2.5">
+        {#each byPriority as p}
+          <button
+            type="button"
+            class="flex w-full items-center gap-2 text-left"
+            class:opacity-40={fPriority && fPriority !== p.key}
+            on:click={() => (fPriority = fPriority === p.key ? '' : p.key)}
+            use:tooltip={{ text: fPriority === p.key ? `Quitar filtro: ${p.label}` : `Filtrar por ${p.label}`, placement: 'left' }}
+          >
+            <span
+              class="h-2.5 w-2.5 shrink-0 rounded-full {p.pulse && p.value > 0 ? 'animate-pulse-ring' : ''}"
+              style="background:{p.color}; --glow:{p.glow}"
+            ></span>
+            <span class="w-14 shrink-0 text-xs font-medium text-slate-600">{p.label}</span>
+            <span class="h-2.5 flex-1 overflow-hidden rounded-full bg-slate-100">
+              <span class="block h-full rounded-full" style="width:{(p.value / prioTotal) * 100 * a}%; background:{p.color}"></span>
+            </span>
+            <span class="w-6 shrink-0 text-right text-xs font-bold tabular-nums text-slate-900">{p.value}</span>
+          </button>
         {/each}
       </div>
     </Card>
-  </div>
 
-  <!-- Tiempo de cierre + acceso rápido -->
-  <div in:fly={{ y: 16, duration: 500, delay: 500, easing: cubicOut }} class="space-y-3 sm:space-y-4">
+    <!-- Tiempo prom. de cierre (live) -->
     <Card>
       <div class="flex items-center gap-3">
         <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-slate-100 text-slate-700">
-          <Clock class="h-5 w-5" />
+          <Timer class="h-5 w-5" />
         </div>
         <div>
-          <p class="text-xs uppercase tracking-wider text-slate-500">Tiempo promedio de cierre</p>
+          <p class="text-xs uppercase tracking-wider text-slate-500">Tiempo prom. de cierre</p>
           <p class="text-2xl font-bold tabular-nums text-slate-900">
-            {kpis?.avg_close_time_hours != null ? (kpis.avg_close_time_hours * a).toFixed(1) : '—'}
-            <span class="text-sm font-normal text-slate-500">h</span>
+            {(avgClose * a).toFixed(1)}<span class="text-sm font-normal text-slate-500"> h</span>
           </p>
-          <p class="text-xs text-slate-400">Últimos 30 días</p>
+          <p class="text-xs text-slate-400">
+            {closedRecent.length ? `${closedRecent.length} cerrados · últimos 30 días` : 'sin casos cerrados aún'}
+          </p>
         </div>
-      </div>
-    </Card>
-
-    <Card title="Acceso rápido">
-      <div class="space-y-2">
-        {#each [['/equipment/scan', '📷', 'Escanear QR'], ['/cases', '🛠️', 'Ver casos'], ['/alerts', '🔔', 'Alertas']] as [href, icon, label]}
-          <a
-            {href}
-            class="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700"
-          >
-            <span class="flex items-center gap-2">
-              <span class="text-lg">{icon}</span>
-              {label}
-            </span>
-            <ArrowRight class="h-4 w-4" />
-          </a>
-        {/each}
       </div>
     </Card>
   </div>
 </div>
 
-<!-- Cumplimiento por norma (datos reales del endpoint compliance) -->
-{#if compliance && compliance.items.length > 0}
-  <div in:fly={{ y: 16, duration: 500, delay: 570, easing: cubicOut }} class="mt-3 sm:mt-4">
-    <Card>
-      <header class="mb-4 flex items-center gap-2">
-        <ShieldCheck class="h-4 w-4 text-brand-600" />
-        <h3 class="text-base font-semibold text-slate-900">Cumplimiento por norma</h3>
-      </header>
-
-      <div class="space-y-3.5">
-        {#each compliance.items as item}
-          {@const pct = Math.round(item.coverage_pct * a)}
-          <div>
-            <div class="mb-1 flex items-baseline justify-between gap-2">
-              <span class="min-w-0 truncate text-sm font-medium text-slate-700">
-                <span class="font-semibold text-slate-900">{item.standard_code}</span>
-                <span class="text-slate-400"> · </span>{item.standard_name}
-              </span>
-              <span class="shrink-0 text-sm font-bold tabular-nums text-slate-900">{pct}%</span>
-            </div>
-            <div class="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-              <div
-                class="h-full rounded-full bg-gradient-to-r {item.coverage_pct >= 80
-                  ? 'from-emerald-400 to-emerald-600'
-                  : item.coverage_pct >= 50
-                    ? 'from-amber-400 to-amber-500'
-                    : 'from-rose-400 to-rose-600'}"
-                style="width:{item.coverage_pct * a}%"
-              ></div>
-            </div>
-            <p class="mt-1 text-xs text-slate-400">
-              {item.equipment_with} de {item.equipment_total} equipos
-            </p>
-          </div>
-        {/each}
-      </div>
-    </Card>
-  </div>
-{/if}
+<CaseEditModal bind:open={editOpen} value={editCase} {engineers} on:saved={(e) => upsert(e.detail)} />
+<CaseLegendModal bind:open={legendOpen} />
