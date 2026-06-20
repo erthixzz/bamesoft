@@ -8,7 +8,9 @@
   import {
     PRIORITY_META,
     STATUS_META,
-    STATUS_OPTIONS,
+    STATUS_GROUP_OPTIONS,
+    statusGroupKey,
+    groupToStatus,
     TYPE_LABEL,
     caseAgeHours,
     formatAge,
@@ -27,9 +29,10 @@
   let busy = false;
 
   // Valores locales de los selects en línea (se resincronizan si cambia `c`).
-  let statusVal = c.status;
+  // El estado se muestra resumido por grupo (Esp. repuestos/cliente → "En espera").
+  let statusVal = statusGroupKey(c.status);
   let assigneeVal = c.assigned_to ?? '';
-  $: statusVal = c.status;
+  $: statusVal = statusGroupKey(c.status);
   $: assigneeVal = c.assigned_to ?? '';
 
   $: prio = PRIORITY_META[c.priority];
@@ -56,7 +59,8 @@
   }
 
   function onStatusChange(v: string) {
-    if (v && v !== c.status) persist({ status: v as Case['status'] });
+    const next = groupToStatus(v, c.status);
+    if (next !== c.status) persist({ status: next });
   }
   function onAssigneeChange(v: string) {
     if ((v || null) !== (c.assigned_to ?? null)) persist({ assigned_to: (v || null) as never });
@@ -114,7 +118,7 @@
   <div class="grid grid-cols-2 gap-2 pl-1.5">
     <Select
       bind:value={statusVal}
-      options={STATUS_OPTIONS}
+      options={STATUS_GROUP_OPTIONS}
       disabled={busy}
       on:change={(e) => onStatusChange(e.detail)}
     />

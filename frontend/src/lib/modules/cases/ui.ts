@@ -99,6 +99,31 @@ export const STATUS_GROUPS: StatusGroup[] = [
 
 export const STATUS_GROUP_OPTIONS = STATUS_GROUPS.map((g) => ({ value: g.key, label: g.label }));
 
+/** Descripción corta de cada grupo de estado resumido (para la leyenda "?"). */
+export const STATUS_GROUP_DESCRIPTIONS: Record<string, string> = {
+  open: 'Reportado, aún sin ingeniero asignado.',
+  assigned: 'Asignado a un ingeniero; pendiente de iniciar.',
+  in_progress: 'El ingeniero está trabajando en el caso.',
+  waiting: 'En pausa esperando repuestos, insumos o respuesta del cliente.',
+  closed: 'Resuelto y cerrado.',
+  cancelled: 'Anulado; no se le dará seguimiento.',
+};
+
+/** Clave del grupo resumido al que pertenece un estado concreto. */
+export function statusGroupKey(status: CaseStatus): string {
+  return STATUS_GROUPS.find((g) => g.statuses.includes(status))?.key ?? status;
+}
+
+/** Traduce la clave de un grupo resumido al estado concreto que se guardará.
+ *  Si el caso ya está dentro del grupo, conserva su subestado actual
+ *  (p. ej. no convierte "Esp. cliente" en "Esp. repuestos" sin necesidad). */
+export function groupToStatus(key: string, current: CaseStatus): CaseStatus {
+  const group = STATUS_GROUPS.find((g) => g.key === key);
+  if (!group) return current;
+  if (group.statuses.includes(current)) return current;
+  return group.statuses[0];
+}
+
 /** Estados que cuentan como "activos" (no cerrados/cancelados). */
 export const ACTIVE_STATUSES: CaseStatus[] = [
   'open',

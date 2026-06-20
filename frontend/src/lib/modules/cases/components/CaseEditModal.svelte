@@ -9,7 +9,12 @@
   import { casesApi } from '$lib/modules/cases/api';
   import type { Case, CaseUpdate } from '$lib/modules/cases/types';
   import type { User } from '$lib/modules/users/types';
-  import { PRIORITY_OPTIONS, STATUS_OPTIONS } from '$lib/modules/cases/ui';
+  import {
+    PRIORITY_OPTIONS,
+    STATUS_GROUP_OPTIONS,
+    statusGroupKey,
+    groupToStatus,
+  } from '$lib/modules/cases/ui';
   import { toasts } from '$lib/stores/toasts';
 
   export let open = false;
@@ -36,7 +41,7 @@
     title = c.title ?? '';
     description = c.description ?? '';
     priority = c.priority;
-    status = c.status;
+    status = statusGroupKey(c.status); // se edita por grupo resumido
     assigned_to = c.assigned_to ?? '';
     // El backend entrega ISO con zona; el DatePicker usa "YYYY-MM-DDTHH:MM".
     sla_due_at = c.sla_due_at ? new Date(c.sla_due_at).toISOString().slice(0, 16) : '';
@@ -62,7 +67,7 @@
         title: title.trim(),
         description: description.trim() || undefined,
         priority: priority as Case['priority'],
-        status: status as Case['status'],
+        status: groupToStatus(status, value.status),
         assigned_to: assigned_to || undefined,
         sla_due_at: sla_due_at ? new Date(sla_due_at).toISOString() : undefined,
       };
@@ -86,7 +91,7 @@
       <Textarea label="Descripción" bind:value={description} rows={3} placeholder="Detalle del problema…" />
       <div class="grid gap-4 sm:grid-cols-2">
         <Select label="Prioridad" bind:value={priority} options={PRIORITY_OPTIONS} />
-        <Select label="Estado" bind:value={status} options={STATUS_OPTIONS} />
+        <Select label="Estado" bind:value={status} options={STATUS_GROUP_OPTIONS} />
       </div>
       <Select
         label="Asignar a ingeniero"
