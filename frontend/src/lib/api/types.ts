@@ -31,6 +31,8 @@ export type CaseStatus =
 
 export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 
+export type CaseCompletion = 'complete' | 'incomplete';
+
 export type AlertType =
   | 'preventive_due'
   | 'calibration_due'
@@ -47,6 +49,8 @@ export type DocumentType =
   | 'standard'
   | 'invoice'
   | 'life_sheet'
+  | 'photo'
+  | 'signature'
   | 'other';
 
 export interface Paginated<T> {

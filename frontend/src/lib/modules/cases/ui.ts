@@ -2,7 +2,7 @@
  *  Centraliza colores de "semáforo", opciones de selects y cálculos de
  *  edad / SLA para que dashboard, lista y detalle se vean coherentes.
  */
-import type { CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
 import type { Case } from './types';
 
 export interface PriorityMeta {
@@ -59,6 +59,15 @@ export const TYPE_OPTIONS = (Object.keys(TYPE_LABEL) as CaseType[]).map((value) 
   value,
   label: TYPE_LABEL[value],
 }));
+
+export const COMPLETION_LABEL: Record<CaseCompletion, string> = {
+  complete: 'Completo',
+  incomplete: 'Incompleto',
+};
+
+export const COMPLETION_OPTIONS = (Object.keys(COMPLETION_LABEL) as CaseCompletion[]).map(
+  (value) => ({ value, label: COMPLETION_LABEL[value] }),
+);
 
 /** Descripción corta de cada estado (para la leyenda "?"). */
 export const STATUS_DESCRIPTIONS: Record<CaseStatus, string> = {
@@ -173,6 +182,17 @@ export function slaInfo(c: Case): SlaInfo {
   if (hoursLeft < 0) return { state: 'overdue', label: `Vencido ${formatAge(-hoursLeft)}`, hoursLeft };
   if (hoursLeft < 24) return { state: 'soon', label: `Vence en ${formatAge(hoursLeft)}`, hoursLeft };
   return { state: 'ok', label: `${formatAge(hoursLeft)} restantes`, hoursLeft };
+}
+
+/** Diferencia humana entre dos instantes ISO; "—" si falta alguno. */
+export function elapsedBetween(
+  from: string | null | undefined,
+  to: string | null | undefined,
+): string {
+  if (!from || !to) return '—';
+  const ms = new Date(to).getTime() - new Date(from).getTime();
+  if (ms < 0) return '—';
+  return formatAge(ms / 3_600_000);
 }
 
 /** ¿Lleva demasiado tiempo abierto? (umbral por prioridad, en horas) */

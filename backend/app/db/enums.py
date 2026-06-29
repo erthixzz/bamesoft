@@ -53,6 +53,13 @@ class CasePriority(StrEnum):
     CRITICAL = "critical"
 
 
+class CaseCompletion(StrEnum):
+    """Estado final del servicio realizado en el caso."""
+
+    COMPLETE = "complete"
+    INCOMPLETE = "incomplete"
+
+
 class AlertType(StrEnum):
     PREVENTIVE_DUE = "preventive_due"
     CALIBRATION_DUE = "calibration_due"
@@ -74,4 +81,6 @@ class DocumentType(StrEnum):
     STANDARD = "standard"
     INVOICE = "invoice"
     LIFE_SHEET = "life_sheet"
+    PHOTO = "photo"
+    SIGNATURE = "signature"
     OTHER = "other"

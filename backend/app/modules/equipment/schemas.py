@@ -21,6 +21,7 @@ class EquipmentBase(BaseModel):
     status: EquipmentStatus = EquipmentStatus.OPERATIONAL
     clinic_id: uuid.UUID
     location_id: uuid.UUID | None = None
+    sector_id: uuid.UUID | None = None
     acquisition_date: date | None = None
     warranty_until: date | None = None
     image_url: str | None = None
@@ -41,6 +42,7 @@ class EquipmentUpdate(BaseModel):
     risk_class: RiskClass | None = None
     status: EquipmentStatus | None = None
     location_id: uuid.UUID | None = None
+    sector_id: uuid.UUID | None = None
     acquisition_date: date | None = None
     warranty_until: date | None = None
     image_url: str | None = None

@@ -5,6 +5,9 @@
   import { fly, fade } from 'svelte/transition';
   import { tooltip } from '$lib/actions/tooltip';
   import CaseLegendModal from '$lib/modules/cases/components/CaseLegendModal.svelte';
+  import { role } from '$lib/stores/auth';
+  import { isOneOf } from '$lib/utils/permissions';
+  import type { UserRole } from '$lib/api/types';
   import {
     LayoutDashboard,
     Wrench,
@@ -21,18 +24,21 @@
 
   let legendOpen = false;
 
-  const items = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  // `roles` ausente = visible para todos. El operario (service) y el cliente
+  // ven solo lo necesario para reportar y consultar.
+  const items: { href: string; label: string; icon: typeof Wrench; roles?: UserRole[] }[] = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'engineer', 'support'] },
     { href: '/equipment', label: 'Equipos', icon: QrCode },
     { href: '/cases', label: 'Casos', icon: Wrench },
     { href: '/alerts', label: 'Alertas', icon: AlertTriangle },
     { href: '/documents', label: 'Documentos', icon: FileText },
-    { href: '/standards', label: 'Normas', icon: BookOpen },
-    { href: '/reports', label: 'Reportes', icon: BarChart3 },
-    { href: '/users', label: 'Usuarios', icon: Users },
+    { href: '/standards', label: 'Normas', icon: BookOpen, roles: ['admin', 'engineer'] },
+    { href: '/reports', label: 'Reportes', icon: BarChart3, roles: ['admin', 'engineer', 'support'] },
+    { href: '/users', label: 'Usuarios', icon: Users, roles: ['admin'] },
     { href: '/settings', label: 'Ajustes', icon: Settings },
   ];
 
+  $: visibleItems = items.filter((i) => !i.roles || isOneOf($role, i.roles));
   $: current = $page.url.pathname;
 
   // Cerrar el drawer al navegar (móvil)
@@ -49,7 +55,7 @@
     </div>
   </div>
   <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-    {#each items as item}
+    {#each visibleItems as item}
       {@const active = current === item.href || current.startsWith(item.href + '/')}
       <a
         href={item.href}

@@ -19,6 +19,7 @@ if TYPE_CHECKING:
     from app.modules.cases.models import Case
     from app.modules.clinics.models import Clinic, Location
     from app.modules.maintenance.models import MaintenanceSchedule
+    from app.modules.sectors.models import Sector
     from app.modules.standards.models import EquipmentStandard
 
 
@@ -64,6 +65,9 @@ class Equipment(Base, UUIDPrimaryKey, Timestamps):
     location_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True), ForeignKey("locations.id", ondelete="SET NULL")
     )
+    sector_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("sectors.id", ondelete="SET NULL")
+    )
 
     # Vida útil
     acquisition_date: Mapped[date | None] = mapped_column(Date)
@@ -77,6 +81,7 @@ class Equipment(Base, UUIDPrimaryKey, Timestamps):
     category: Mapped["EquipmentCategory | None"] = relationship(back_populates="equipment")
     clinic: Mapped["Clinic"] = relationship(back_populates="equipment")
     location: Mapped["Location | None"] = relationship(back_populates="equipment")
+    sector: Mapped["Sector | None"] = relationship()
 
     cases: Mapped[list["Case"]] = relationship(back_populates="equipment")
     schedules: Mapped[list["MaintenanceSchedule"]] = relationship(

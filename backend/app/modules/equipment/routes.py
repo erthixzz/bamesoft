@@ -26,6 +26,7 @@ router = APIRouter(prefix="/equipment", tags=["equipment"])
 @router.get("", response_model=list[EquipmentOut])
 async def list_equipment(
     clinic_id: uuid.UUID | None = None,
+    sector_id: uuid.UUID | None = None,
     status_: EquipmentStatus | None = Query(default=None, alias="status"),
     q: str | None = Query(default=None, description="Búsqueda libre"),
     limit: int = 50,
@@ -35,7 +36,13 @@ async def list_equipment(
 ):
     return list(
         await service.list_equipment(
-            db, clinic_id=clinic_id, status=status_, q=q, limit=limit, offset=offset
+            db,
+            clinic_id=clinic_id,
+            sector_id=sector_id,
+            status=status_,
+            q=q,
+            limit=limit,
+            offset=offset,
         )
     )
 

@@ -1,16 +1,48 @@
 """Reportes / KPIs."""
 from __future__ import annotations
 
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 
 from sqlalchemy import distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.enums import CaseStatus
+from app.db.enums import CaseCompletion, CaseStatus
 from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
-from app.modules.reports.schemas import ComplianceItem, ComplianceReport, DashboardKPIs
+from app.modules.reports.schemas import (
+    ComplianceItem,
+    ComplianceReport,
+    DailyPoint,
+    DashboardKPIs,
+    OperationsReport,
+    ProductivityReport,
+    ProductivityRow,
+    ReporterRow,
+)
 from app.modules.standards.models import EquipmentStandard, Standard
+from app.modules.users.models import User
+
+_WAITING = (CaseStatus.WAITING_PARTS, CaseStatus.WAITING_CLIENT)
+
+
+def _opened_col():
+    """Fecha de referencia del caso (apertura o, en su defecto, creación)."""
+    return func.coalesce(Case.opened_at, Case.created_at)
+
+
+def _range_filters(date_from: date | None, date_to: date | None) -> list:
+    conds = []
+    col = _opened_col()
+    if date_from:
+        conds.append(col >= datetime(date_from.year, date_from.month, date_from.day, tzinfo=UTC))
+    if date_to:
+        end = datetime(date_to.year, date_to.month, date_to.day, tzinfo=UTC) + timedelta(days=1)
+        conds.append(col < end)
+    return conds
+
+
+def _hours(seconds: float | None) -> float | None:
+    return round(float(seconds) / 3600.0, 2) if seconds else None
 
 
 # Una sola query SQL que devuelve todos los KPIs en columnas paralelas:
@@ -96,3 +128,159 @@ async def compliance(db: AsyncSession) -> ComplianceReport:
         for r in rows
     ]
     return ComplianceReport(items=items, total=len(items))
+
+
+async def productivity(
+    db: AsyncSession, date_from: date | None = None, date_to: date | None = None
+) -> ProductivityReport:
+    """Productividad por ingeniero: atendidos, completados/incompletos, tiempos de
+    respuesta de cada tramo del flujo y FCR (resueltos completos a la primera)."""
+    rng = _range_filters(date_from, date_to)
+
+    def avg_secs(a, b):
+        return func.avg(func.extract("epoch", b - a))
+
+    completed = func.count().filter(Case.completion == CaseCompletion.COMPLETE)
+    incomplete = func.count().filter(Case.completion == CaseCompletion.INCOMPLETE)
+    closed = func.count().filter(Case.status == CaseStatus.CLOSED)
+    fcr = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
+    )
+
+    stmt = (
+        select(
+            Case.assigned_to.label("eid"),
+            User.full_name.label("name"),
+            func.count().label("attended"),
+            completed.label("completed"),
+            incomplete.label("incomplete"),
+            closed.label("closed"),
+            avg_secs(Case.assigned_at, Case.accepted_at).label("resp"),
+            avg_secs(Case.accepted_at, Case.work_started_at).label("to_start"),
+            avg_secs(Case.work_started_at, Case.finished_at).label("work"),
+            fcr.label("fcr"),
+        )
+        .join(User, User.id == Case.assigned_to, isouter=True)
+        .where(Case.assigned_to.is_not(None), *rng)
+        .group_by(Case.assigned_to, User.full_name)
+        .order_by(func.count().desc())
+    )
+    rows = (await db.execute(stmt)).all()
+
+    items: list[ProductivityRow] = []
+    tot_att = tot_comp = tot_inc = tot_fcr = 0
+    for r in rows:
+        att = r.attended or 0
+        items.append(
+            ProductivityRow(
+                engineer_id=str(r.eid) if r.eid else None,
+                engineer_name=r.name or "Sin nombre",
+                attended=att,
+                completed=r.completed or 0,
+                incomplete=r.incomplete or 0,
+                closed=r.closed or 0,
+                avg_response_hours=_hours(r.resp),
+                avg_to_start_hours=_hours(r.to_start),
+                avg_work_hours=_hours(r.work),
+                fcr_count=r.fcr or 0,
+                fcr_pct=round((r.fcr or 0) / att * 100.0, 1) if att else 0.0,
+            )
+        )
+        tot_att += att
+        tot_comp += r.completed or 0
+        tot_inc += r.incomplete or 0
+        tot_fcr += r.fcr or 0
+
+    return ProductivityReport(
+        items=items,
+        attended=tot_att,
+        completed=tot_comp,
+        incomplete=tot_inc,
+        fcr_count=tot_fcr,
+        fcr_pct=round(tot_fcr / tot_att * 100.0, 1) if tot_att else 0.0,
+    )
+
+
+async def operations(
+    db: AsyncSession, date_from: date | None = None, date_to: date | None = None
+) -> OperationsReport:
+    """Operación: llamadas reportadas/cerradas por día, incompletos, en espera y
+    desglose por quién reportó (atendió la llamada)."""
+    rng = _range_filters(date_from, date_to)
+
+    totals = (
+        await db.execute(
+            select(
+                func.count().label("reported"),
+                func.count().filter(Case.status == CaseStatus.CLOSED).label("closed"),
+                func.count().filter(Case.completion == CaseCompletion.COMPLETE).label("complete"),
+                func.count().filter(Case.completion == CaseCompletion.INCOMPLETE).label("incomplete"),
+            ).where(*rng)
+        )
+    ).one()
+
+    waiting_now = await db.scalar(
+        select(func.count()).where(Case.status.in_(_WAITING))
+    )
+
+    # Reportados por día.
+    day = func.date(_opened_col())
+    rep_rows = (
+        await db.execute(
+            select(day.label("d"), func.count().label("n")).where(*rng).group_by(day)
+        )
+    ).all()
+    # Cerrados por día (sobre la fecha de cierre, dentro del mismo rango).
+    cday = func.date(Case.closed_at)
+    cl_conds = [Case.closed_at.is_not(None)]
+    if date_from:
+        cl_conds.append(cday >= date_from)
+    if date_to:
+        cl_conds.append(cday <= date_to)
+    cl_rows = (
+        await db.execute(
+            select(cday.label("d"), func.count().label("n")).where(*cl_conds).group_by(cday)
+        )
+    ).all()
+
+    daily_map: dict[str, DailyPoint] = {}
+    for r in rep_rows:
+        k = str(r.d)
+        daily_map.setdefault(k, DailyPoint(day=k)).reported = r.n
+    for r in cl_rows:
+        k = str(r.d)
+        daily_map.setdefault(k, DailyPoint(day=k)).closed = r.n
+    daily = [daily_map[k] for k in sorted(daily_map)]
+
+    rep_by = (
+        await db.execute(
+            select(
+                Case.reported_by.label("uid"),
+                User.full_name.label("name"),
+                func.count().label("n"),
+            )
+            .join(User, User.id == Case.reported_by, isouter=True)
+            .where(*rng)
+            .group_by(Case.reported_by, User.full_name)
+            .order_by(func.count().desc())
+            .limit(20)
+        )
+    ).all()
+    by_reporter = [
+        ReporterRow(
+            user_id=str(r.uid) if r.uid else None,
+            name=r.name or "Desconocido",
+            count=r.n or 0,
+        )
+        for r in rep_by
+    ]
+
+    return OperationsReport(
+        reported_total=totals.reported or 0,
+        closed_total=totals.closed or 0,
+        complete_total=totals.complete or 0,
+        incomplete_total=totals.incomplete or 0,
+        waiting_now=waiting_now or 0,
+        daily=daily,
+        by_reporter=by_reporter,
+    )

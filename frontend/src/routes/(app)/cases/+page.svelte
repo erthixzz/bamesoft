@@ -13,10 +13,14 @@
   import { formatDate } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
+  import { profile, role } from '$lib/stores/auth';
+  import { get } from 'svelte/store';
   import { Wrench, PlusCircle, Eye, Copy } from 'lucide-svelte';
 
   let rows: Case[] = [];
   let loading = true;
+  // El operario (service) solo ve los casos que él reportó.
+  $: onlyMine = $role === 'service';
   const columns = [
     { key: 'code', label: 'Código' },
     { key: 'title', label: 'Título' },
@@ -29,7 +33,9 @@
   onMount(async () => {
     setPageTitle('Casos');
     try {
-      rows = await casesApi.list();
+      const all = await casesApi.list();
+      const myId = get(profile)?.id;
+      rows = get(role) === 'service' && myId ? all.filter((c) => c.reported_by === myId) : all;
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -53,7 +59,14 @@
   ];
 </script>
 
-<PageHeader title="Casos" subtitle="Tickets de mantenimiento, calibración e inspección" icon={Wrench} gradient="amber">
+<PageHeader
+  title="Casos"
+  subtitle={onlyMine
+    ? 'Casos que has reportado'
+    : 'Tickets de mantenimiento, calibración e inspección'}
+  icon={Wrench}
+  gradient="amber"
+>
   <svelte:fragment slot="actions">
     <a class="btn-primary" href="/cases/new">
       <PlusCircle class="h-4 w-4" /> Nuevo caso

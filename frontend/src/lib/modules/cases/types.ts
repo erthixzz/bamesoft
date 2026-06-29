@@ -1,6 +1,18 @@
-import type { CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
 
-export interface Case {
+/** Campos del soporte/cierre del servicio (compartidos entre Case y CaseUpdate). */
+export interface CaseResolution {
+  operation_minutes?: number | null;
+  work_performed?: string | null;
+  parts_count?: number | null;
+  parts_detail?: string | null;
+  completion?: CaseCompletion | null;
+  receiver_name?: string | null;
+  receiver_doc?: string | null;
+  signature_path?: string | null;
+}
+
+export interface Case extends CaseResolution {
   id: string;
   code: string;
   title: string;
@@ -15,6 +27,10 @@ export interface Case {
   opened_at?: string | null;
   closed_at?: string | null;
   sla_due_at?: string | null;
+  assigned_at?: string | null;
+  accepted_at?: string | null;
+  work_started_at?: string | null;
+  finished_at?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -30,11 +46,13 @@ export interface CaseCreate {
   sla_due_at?: string;
 }
 
-export interface CaseUpdate {
+export interface CaseUpdate extends CaseResolution {
   title?: string;
   description?: string;
+  type?: CaseType;
   priority?: CasePriority;
   status?: CaseStatus;
+  sector_id?: string;
   assigned_to?: string;
   sla_due_at?: string;
 }

@@ -14,6 +14,7 @@ export interface Equipment {
   status: EquipmentStatus;
   clinic_id: string;
   location_id?: string | null;
+  sector_id?: string | null;
   acquisition_date?: string | null;
   warranty_until?: string | null;
   decommissioned_at?: string | null;
@@ -35,6 +36,7 @@ export interface EquipmentCreate {
   status?: EquipmentStatus;
   clinic_id: string;
   location_id?: string;
+  sector_id?: string;
   acquisition_date?: string;
   warranty_until?: string;
   notes?: string;

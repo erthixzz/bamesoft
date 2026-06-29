@@ -10,6 +10,7 @@
   import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
   import { Pencil, FileUp, Copy, ExternalLink, Download, FileText } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
+  import { sectorsApi } from '$lib/modules/sectors/api';
   import { publicQrPngUrl } from '$lib/modules/public/api';
   import { toasts } from '$lib/stores/toasts';
   import { casesApi } from '$lib/modules/cases/api';
@@ -30,6 +31,7 @@
   let cals: Calibration[] = [];
   let pms: MaintenanceSchedule[] = [];
   let docs: Doc[] = [];
+  let sectorLabel = '—';
   let loading = true;
   let error: string | null = null;
   let editOpen = false;
@@ -49,6 +51,9 @@
         maintenanceApi.forEquipment(id),
         documentsApi.forEquipment(id),
       ]);
+      if (eq.sector_id) {
+        sectorLabel = (await sectorsApi.get(eq.sector_id).catch(() => null))?.name ?? '—';
+      }
     } catch (e) {
       error = e instanceof Error ? e.message : 'Error';
     } finally {
@@ -117,6 +122,7 @@
         <dt class="text-slate-500">Marca</dt><dd>{eq.brand ?? '—'}</dd>
         <dt class="text-slate-500">Modelo</dt><dd>{eq.model ?? '—'}</dd>
         <dt class="text-slate-500">Serial</dt><dd>{eq.serial_number ?? '—'}</dd>
+        <dt class="text-slate-500">Unidad de servicio</dt><dd>{sectorLabel}</dd>
         <dt class="text-slate-500">Riesgo</dt><dd>{eq.risk_class ?? '—'}</dd>
         <dt class="text-slate-500">Adquirido</dt><dd>{formatDate(eq.acquisition_date)}</dd>
         <dt class="text-slate-500">Garantía</dt><dd>{formatDate(eq.warranty_until)}</dd>

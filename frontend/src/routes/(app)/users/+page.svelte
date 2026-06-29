@@ -6,31 +6,41 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
+  import UserEditModal from '$lib/modules/users/components/UserEditModal.svelte';
   import { usersApi } from '$lib/modules/users/api';
+  import { clinicsApi } from '$lib/modules/clinics/api';
   import type { User } from '$lib/modules/users/types';
+  import type { Clinic } from '$lib/modules/clinics/types';
   import type { CtxItem } from '$lib/stores/contextMenu';
-  import { ROLE_LABELS } from '$lib/utils/permissions';
+  import { ROLE_LABELS, ROLE_CAPABILITIES, ALL_ROLES } from '$lib/utils/permissions';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
   import type { UserRole } from '$lib/api/types';
-  import { Users, Copy, UserX } from 'lucide-svelte';
+  import { Users, Copy, UserX, Pencil, Check, ShieldCheck } from 'lucide-svelte';
 
   function roleLabel(r: string): string {
     return ROLE_LABELS[r as UserRole] ?? r;
   }
 
   let rows: User[] = [];
+  let clinics: Clinic[] = [];
   let loading = true;
+  let editOpen = false;
+  let editing: User | null = null;
+
+  $: clinicName = Object.fromEntries(clinics.map((c) => [c.id, c.name]));
+
   const columns = [
     { key: 'full_name', label: 'Nombre' },
     { key: 'email', label: 'Email' },
+    { key: 'clinic_id', label: 'Compañía' },
     { key: 'role', label: 'Rol' },
     { key: 'active', label: 'Estado' },
   ];
 
   async function load() {
     try {
-      rows = await usersApi.list();
+      [rows, clinics] = await Promise.all([usersApi.list(), clinicsApi.list().catch(() => [])]);
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'Error');
     } finally {
@@ -42,6 +52,15 @@
     setPageTitle('Usuarios');
     load();
   });
+
+  function edit(row: User) {
+    editing = row;
+    editOpen = true;
+  }
+
+  function onSaved() {
+    load();
+  }
 
   async function copy(text: string, label = 'Copiado') {
     try {
@@ -64,6 +83,7 @@
   }
 
   const rowMenu = (row: User): CtxItem[] => [
+    { label: 'Editar', icon: Pencil, onClick: () => edit(row) },
     { label: 'Copiar email', icon: Copy, onClick: () => copy(row.email, 'Email copiado') },
     ...(row.active
       ? [
@@ -74,7 +94,7 @@
   ];
 </script>
 
-<PageHeader title="Usuarios" subtitle="Administradores, ingenieros, servicio, soporte y clientes" icon={Users} gradient="brand" />
+<PageHeader title="Usuarios" subtitle="Gestiona roles, compañías y permisos" icon={Users} gradient="brand" />
 
 <Card>
   {#if loading}
@@ -84,7 +104,14 @@
   {:else}
     <Table {columns} {rows} {rowMenu}>
       <svelte:fragment slot="cell" let:row let:column>
-        {#if column === 'role'}
+        {#if column === 'full_name'}
+          <button type="button" class="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline" on:click={() => edit(row)}>
+            <Pencil class="h-3.5 w-3.5 opacity-60" />
+            {row.full_name}
+          </button>
+        {:else if column === 'clinic_id'}
+          {row.clinic_id ? (clinicName[row.clinic_id] ?? '—') : '—'}
+        {:else if column === 'role'}
           <Badge tone="blue">{roleLabel(row.role)}</Badge>
         {:else if column === 'active'}
           <Badge tone={row.active ? 'green' : 'gray'}>{row.active ? 'Activo' : 'Inactivo'}</Badge>
@@ -95,3 +122,45 @@
     </Table>
   {/if}
 </Card>
+
+<!-- Matriz de permisos por rol -->
+<div class="mt-4">
+  <Card title="Permisos por rol" description="Qué puede hacer cada rol en la plataforma.">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs uppercase text-slate-500">
+          <tr class="border-b border-slate-200">
+            <th class="py-2 pr-3">Capacidad</th>
+            {#each ALL_ROLES as r}
+              <th class="px-2 text-center">{roleLabel(r)}</th>
+            {/each}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {#each ROLE_CAPABILITIES as cap}
+            <tr>
+              <td class="py-2.5 pr-3 text-slate-700">{cap.label}</td>
+              {#each ALL_ROLES as r}
+                <td class="px-2 text-center">
+                  {#if cap.roles.includes(r)}
+                    <Check class="mx-auto h-4 w-4 text-emerald-600" />
+                  {:else}
+                    <span class="text-slate-300">—</span>
+                  {/if}
+                </td>
+              {/each}
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 flex items-center gap-1.5 text-xs text-slate-400">
+      <ShieldCheck class="h-3.5 w-3.5" />
+      El <strong class="text-slate-500">Operario</strong> solo reporta casos; el cierre y el soporte de servicio los realiza el ingeniero.
+    </p>
+  </Card>
+</div>
+
+{#if editing}
+  <UserEditModal bind:open={editOpen} user={editing} on:saved={onSaved} />
+{/if}

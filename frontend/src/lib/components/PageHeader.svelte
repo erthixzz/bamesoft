@@ -8,18 +8,18 @@
   export let gradient: 'brand' | 'cyan' | 'emerald' | 'amber' | 'rose' = 'brand';
 
   const gradientCls: Record<typeof gradient, string> = {
-    brand:   'from-brand-100 to-cyan-100 text-brand-600',
-    cyan:    'from-cyan-100 to-sky-100 text-cyan-600',
-    emerald: 'from-emerald-100 to-teal-100 text-emerald-600',
-    amber:   'from-amber-100 to-orange-100 text-amber-600',
-    rose:    'from-rose-100 to-pink-100 text-rose-600',
+    brand:   'from-brand-600 to-cyan-500 shadow-brand-600/25',
+    cyan:    'from-cyan-600 to-sky-500 shadow-cyan-600/25',
+    emerald: 'from-emerald-600 to-teal-500 shadow-emerald-600/25',
+    amber:   'from-amber-500 to-orange-500 shadow-amber-500/25',
+    rose:    'from-rose-600 to-pink-500 shadow-rose-600/25',
   };
 </script>
 
 <div class="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
   <div class="flex items-center gap-3">
     {#if icon}
-      <div class={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${gradientCls[gradient]} ring-1 ring-white shadow-sm`}>
+      <div class={`grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-gradient-to-br ${gradientCls[gradient]} text-white shadow-md ring-1 ring-white/50`}>
         <svelte:component this={icon} class="h-5 w-5" />
       </div>
     {/if}

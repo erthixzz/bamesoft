@@ -9,7 +9,9 @@
   import DatePicker from '$lib/components/DatePicker.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { clinicsApi } from '$lib/modules/clinics/api';
+  import { sectorsApi } from '$lib/modules/sectors/api';
   import type { Clinic, Location } from '$lib/modules/clinics/types';
+  import type { Sector } from '$lib/modules/sectors/types';
   import type { EquipmentCategory } from '$lib/modules/equipment/types';
   import { profile } from '$lib/stores/auth';
   import { setPageTitle } from '$lib/stores/page';
@@ -18,6 +20,7 @@
 
   let clinics: Clinic[] = [];
   let locations: Location[] = [];
+  let sectors: Sector[] = [];
   let categories: EquipmentCategory[] = [];
   let loading = false;
 
@@ -34,19 +37,19 @@
     status: 'operational' as 'operational' | 'out_of_service' | 'under_maintenance' | 'retired',
     clinic_id: get(profile)?.clinic_id ?? '',
     location_id: '',
+    sector_id: '',
     acquisition_date: '',
     warranty_until: '',
     notes: '',
   };
 
-  $: if (form.clinic_id) loadLocations(form.clinic_id);
+  $: if (form.clinic_id) loadClinicScoped(form.clinic_id);
 
-  async function loadLocations(clinicId: string) {
-    try {
-      locations = await clinicsApi.locations(clinicId);
-    } catch {
-      locations = [];
-    }
+  async function loadClinicScoped(clinicId: string) {
+    [locations, sectors] = await Promise.all([
+      clinicsApi.locations(clinicId).catch(() => []),
+      sectorsApi.list(clinicId).catch(() => []),
+    ]);
   }
 
   onMount(async () => {
@@ -71,6 +74,7 @@
         status: form.status,
         clinic_id: form.clinic_id,
         location_id: form.location_id || undefined,
+        sector_id: form.sector_id || undefined,
         acquisition_date: form.acquisition_date || undefined,
         warranty_until: form.warranty_until || undefined,
         notes: form.notes || undefined,
@@ -131,6 +135,11 @@
           bind:value={form.clinic_id}
           options={clinics.map((c) => ({ value: c.id, label: c.name }))}
           required
+        />
+        <Select
+          label="Unidad de servicio"
+          bind:value={form.sector_id}
+          options={sectors.map((s) => ({ value: s.id, label: s.name }))}
         />
         <Select
           label="Ubicación"

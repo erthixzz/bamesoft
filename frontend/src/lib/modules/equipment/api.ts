@@ -10,6 +10,7 @@ import type { LifeSheet, LifeSheetUpdate } from './lifeSheet';
 
 export interface ListParams {
   clinic_id?: string;
+  sector_id?: string;
   status?: EquipmentStatus;
   q?: string;
   limit?: number;

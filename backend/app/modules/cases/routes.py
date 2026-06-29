@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import CaseStatus
 from app.db.session import get_session
-from app.modules.auth.deps import require_authenticated, require_staff
+from app.modules.auth.deps import require_authenticated, require_engineer
 from app.modules.cases import service
 from app.modules.cases.schemas import (
     CaseActivityIn,
@@ -67,9 +67,18 @@ async def update_case(
     case_id: uuid.UUID,
     payload: CaseUpdate,
     db: AsyncSession = Depends(get_session),
-    current: User = Depends(require_staff),
+    current: User = Depends(require_engineer),
 ):
     return await service.update_case(db, case_id, payload, current.id)
+
+
+@router.post("/{case_id}/accept", response_model=CaseOut)
+async def accept_case(
+    case_id: uuid.UUID,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_engineer),
+):
+    return await service.accept_case(db, case_id, current.id)
 
 
 @router.get("/{case_id}/activities", response_model=list[CaseActivityOut])

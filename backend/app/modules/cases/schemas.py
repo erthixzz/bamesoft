@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.db.enums import CasePriority, CaseStatus, CaseType
+from app.db.enums import CaseCompletion, CasePriority, CaseStatus, CaseType
 
 
 class CaseBase(BaseModel):
@@ -24,9 +24,23 @@ class CaseCreate(CaseBase):
     pass
 
 
-class CaseUpdate(BaseModel):
+class CaseResolution(BaseModel):
+    """Campos del soporte/cierre del servicio."""
+
+    operation_minutes: int | None = Field(default=None, ge=0)
+    work_performed: str | None = None
+    parts_count: int | None = Field(default=None, ge=0)
+    parts_detail: str | None = None
+    completion: CaseCompletion | None = None
+    receiver_name: str | None = Field(default=None, max_length=255)
+    receiver_doc: str | None = Field(default=None, max_length=64)
+    signature_path: str | None = Field(default=None, max_length=1024)
+
+
+class CaseUpdate(CaseResolution):
     title: str | None = None
     description: str | None = None
+    type: CaseType | None = None
     priority: CasePriority | None = None
     status: CaseStatus | None = None
     sector_id: uuid.UUID | None = None
@@ -34,7 +48,7 @@ class CaseUpdate(BaseModel):
     sla_due_at: datetime | None = None
 
 
-class CaseOut(CaseBase):
+class CaseOut(CaseBase, CaseResolution):
     model_config = ConfigDict(from_attributes=True)
     id: uuid.UUID
     code: str
@@ -42,6 +56,10 @@ class CaseOut(CaseBase):
     reported_by: uuid.UUID | None = None
     opened_at: datetime | None = None
     closed_at: datetime | None = None
+    assigned_at: datetime | None = None
+    accepted_at: datetime | None = None
+    work_started_at: datetime | None = None
+    finished_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

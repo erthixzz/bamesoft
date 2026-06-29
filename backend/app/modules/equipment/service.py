@@ -33,6 +33,7 @@ async def list_equipment(
     db: AsyncSession,
     *,
     clinic_id: uuid.UUID | None = None,
+    sector_id: uuid.UUID | None = None,
     status: EquipmentStatus | None = None,
     q: str | None = None,
     limit: int = 50,
@@ -41,6 +42,8 @@ async def list_equipment(
     stmt = select(Equipment).order_by(Equipment.created_at.desc())
     if clinic_id:
         stmt = stmt.where(Equipment.clinic_id == clinic_id)
+    if sector_id:
+        stmt = stmt.where(Equipment.sector_id == sector_id)
     if status:
         stmt = stmt.where(Equipment.status == status)
     if q:

@@ -15,6 +15,7 @@ export const casesApi = {
   get: (id: string) => api.get<Case>(`/cases/${id}`),
   create: (payload: CaseCreate) => api.post<Case>('/cases', payload),
   update: (id: string, payload: CaseUpdate) => api.patch<Case>(`/cases/${id}`, payload),
+  accept: (id: string) => api.post<Case>(`/cases/${id}/accept`),
   activities: (id: string) => api.get<CaseActivity[]>(`/cases/${id}/activities`),
   addActivity: (id: string, action: string, notes?: string) =>
     api.post<CaseActivity>(`/cases/${id}/activities`, { action, notes }),

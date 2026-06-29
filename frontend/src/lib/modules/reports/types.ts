@@ -23,3 +23,48 @@ export interface ComplianceReport {
   items: ComplianceItem[];
   total: number;
 }
+
+export interface ProductivityRow {
+  engineer_id: string | null;
+  engineer_name: string;
+  attended: number;
+  completed: number;
+  incomplete: number;
+  closed: number;
+  avg_response_hours: number | null;
+  avg_to_start_hours: number | null;
+  avg_work_hours: number | null;
+  fcr_count: number;
+  fcr_pct: number;
+}
+
+export interface ProductivityReport {
+  items: ProductivityRow[];
+  attended: number;
+  completed: number;
+  incomplete: number;
+  fcr_count: number;
+  fcr_pct: number;
+}
+
+export interface DailyPoint {
+  day: string;
+  reported: number;
+  closed: number;
+}
+
+export interface ReporterRow {
+  user_id: string | null;
+  name: string;
+  count: number;
+}
+
+export interface OperationsReport {
+  reported_total: number;
+  closed_total: number;
+  complete_total: number;
+  incomplete_total: number;
+  waiting_now: number;
+  daily: DailyPoint[];
+  by_reporter: ReporterRow[];
+}

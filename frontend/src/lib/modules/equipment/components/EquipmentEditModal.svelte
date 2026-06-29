@@ -7,7 +7,9 @@
   import Button from '$lib/components/Button.svelte';
   import DatePicker from '$lib/components/DatePicker.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
+  import { sectorsApi } from '$lib/modules/sectors/api';
   import type { Equipment, EquipmentUpdate } from '$lib/modules/equipment/types';
+  import type { Sector } from '$lib/modules/sectors/types';
   import { toasts } from '$lib/stores/toasts';
 
   export let open = false;
@@ -15,6 +17,7 @@
 
   const dispatch = createEventDispatcher<{ saved: Equipment }>();
 
+  let sectors: Sector[] = [];
   let form = {
     name: '',
     brand: '',
@@ -23,6 +26,7 @@
     manufacturer: '',
     status: 'operational' as Equipment['status'],
     risk_class: '',
+    sector_id: '',
     notes: '',
     acquisition_date: '',
     warranty_until: '',
@@ -37,10 +41,19 @@
     manufacturer: equipment.manufacturer ?? '',
     status: equipment.status,
     risk_class: equipment.risk_class ?? '',
+    sector_id: equipment.sector_id ?? '',
     notes: equipment.notes ?? '',
     acquisition_date: equipment.acquisition_date ?? '',
     warranty_until: equipment.warranty_until ?? '',
   };
+
+  // Cargar las unidades de servicio de la clínica del equipo al abrir.
+  $: if (open && equipment.clinic_id && sectors.length === 0) {
+    sectorsApi
+      .list(equipment.clinic_id)
+      .then((s) => (sectors = s))
+      .catch(() => (sectors = []));
+  }
 
   async function save() {
     saving = true;
@@ -53,6 +66,7 @@
         manufacturer: form.manufacturer || undefined,
         status: form.status,
         risk_class: (form.risk_class || undefined) as 'I' | 'IIa' | 'IIb' | 'III' | undefined,
+        sector_id: form.sector_id || undefined,
         notes: form.notes || undefined,
         acquisition_date: form.acquisition_date || undefined,
         warranty_until: form.warranty_until || undefined,
@@ -95,6 +109,11 @@
         { value: 'IIb', label: 'IIb' },
         { value: 'III', label: 'III' },
       ]}
+    />
+    <Select
+      label="Unidad de servicio"
+      bind:value={form.sector_id}
+      options={sectors.map((s) => ({ value: s.id, label: s.name }))}
     />
     <DatePicker label="Adquirido" bind:value={form.acquisition_date} />
     <DatePicker label="Garantía hasta" bind:value={form.warranty_until} />

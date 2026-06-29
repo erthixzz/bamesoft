@@ -5,12 +5,12 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.db.enums import CasePriority, CaseStatus, CaseType
+from app.db.enums import CaseCompletion, CasePriority, CaseStatus, CaseType
 from app.db.mixins import Timestamps, UUIDPrimaryKey
 from app.db.types import pg_enum
 
@@ -56,6 +56,24 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     opened_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     sla_due_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Tiempos de flujo del servicio (alimentan métricas de productividad).
+    assigned_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    work_started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    # Resolución / soporte de servicio.
+    operation_minutes: Mapped[int | None] = mapped_column(Integer)
+    work_performed: Mapped[str | None] = mapped_column(Text)
+    parts_count: Mapped[int | None] = mapped_column(Integer)
+    parts_detail: Mapped[str | None] = mapped_column(Text)
+    completion: Mapped[CaseCompletion | None] = mapped_column(
+        pg_enum(CaseCompletion, "case_completion")
+    )
+    receiver_name: Mapped[str | None] = mapped_column(String(255))
+    receiver_doc: Mapped[str | None] = mapped_column(String(64))
+    signature_path: Mapped[str | None] = mapped_column(String(1024))
 
     equipment: Mapped["Equipment"] = relationship(back_populates="cases")
     reporter: Mapped["User | None"] = relationship(foreign_keys=[reported_by])

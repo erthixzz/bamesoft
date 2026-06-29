@@ -1,12 +1,19 @@
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from datetime import date
+
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.modules.auth.deps import require_authenticated
 from app.modules.reports import service
-from app.modules.reports.schemas import ComplianceReport, DashboardKPIs
+from app.modules.reports.schemas import (
+    ComplianceReport,
+    DashboardKPIs,
+    OperationsReport,
+    ProductivityReport,
+)
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/reports", tags=["reports"])
@@ -26,3 +33,23 @@ async def compliance(
     _: User = Depends(require_authenticated),
 ):
     return await service.compliance(db)
+
+
+@router.get("/productivity", response_model=ProductivityReport)
+async def productivity(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: AsyncSession = Depends(get_session),
+    _: User = Depends(require_authenticated),
+):
+    return await service.productivity(db, date_from, date_to)
+
+
+@router.get("/operations", response_model=OperationsReport)
+async def operations(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: AsyncSession = Depends(get_session),
+    _: User = Depends(require_authenticated),
+):
+    return await service.operations(db, date_from, date_to)

@@ -57,11 +57,14 @@ async def create_case(db: AsyncSession, payload: CaseCreate, reporter_id: uuid.U
         if sector and sector.default_engineer_id:
             data["assigned_to"] = sector.default_engineer_id
 
+    now = datetime.now(UTC)
+    assigned = bool(data.get("assigned_to"))
     obj = Case(
         code=_new_case_code(),
         reported_by=reporter_id,
-        opened_at=datetime.now(UTC),
-        status=CaseStatus.ASSIGNED if data.get("assigned_to") else CaseStatus.OPEN,
+        opened_at=now,
+        status=CaseStatus.ASSIGNED if assigned else CaseStatus.OPEN,
+        assigned_at=now if assigned else None,
         **data,
     )
     db.add(obj)
@@ -85,12 +88,20 @@ async def update_case(
 ) -> Case:
     obj = await get_case(db, case_id)
     data = payload.model_dump(exclude_unset=True)
+    now = datetime.now(UTC)
 
-    # Transiciones especiales
-    if data.get("status") == CaseStatus.CLOSED and obj.status != CaseStatus.CLOSED:
-        obj.closed_at = datetime.now(UTC)
+    # Transiciones especiales: auto-sellado de tiempos del flujo de servicio.
+    new_status = data.get("status")
+    if new_status == CaseStatus.CLOSED and obj.status != CaseStatus.CLOSED:
+        obj.closed_at = now
+        if obj.finished_at is None:
+            obj.finished_at = now
+    if new_status == CaseStatus.IN_PROGRESS and obj.work_started_at is None:
+        obj.work_started_at = now
     if data.get("assigned_to") and obj.status == CaseStatus.OPEN:
         obj.status = CaseStatus.ASSIGNED
+        if obj.assigned_at is None:
+            obj.assigned_at = now
 
     for k, v in data.items():
         setattr(obj, k, v)
@@ -101,6 +112,32 @@ async def update_case(
             author_id=actor_id,
             action="updated",
             notes=", ".join(f"{k}={v}" for k, v in data.items()),
+        )
+    )
+    await db.flush()
+    await db.refresh(obj)
+    return obj
+
+
+async def accept_case(db: AsyncSession, case_id: uuid.UUID, engineer_id: uuid.UUID) -> Case:
+    """El ingeniero toma el caso (sella `accepted_at`)."""
+    obj = await get_case(db, case_id)
+    if obj.status in (CaseStatus.CLOSED, CaseStatus.CANCELLED):
+        raise BadRequest("No se puede tomar un caso cerrado o cancelado")
+
+    now = datetime.now(UTC)
+    if obj.assigned_to is None:
+        obj.assigned_to = engineer_id
+    if obj.assigned_at is None:
+        obj.assigned_at = now
+    if obj.status == CaseStatus.OPEN:
+        obj.status = CaseStatus.ASSIGNED
+    if obj.accepted_at is None:
+        obj.accepted_at = now
+
+    db.add(
+        CaseActivity(
+            case_id=obj.id, author_id=engineer_id, action="accepted", notes="Caso tomado por el ingeniero"
         )
     )
     await db.flush()
