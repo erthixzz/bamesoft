@@ -109,7 +109,7 @@
   <div class="grid gap-3">
     {#each rows as a}
       <div use:contextmenu={rowMenu(a)} class="cursor-context-menu">
-      <Card>
+      <Card interactive>
         <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center gap-2">

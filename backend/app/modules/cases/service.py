@@ -106,12 +106,15 @@ async def update_case(
     for k, v in data.items():
         setattr(obj, k, v)
 
+    # No registrar rutas internas (p. ej. la ruta de almacenamiento de la firma);
+    # el frontend traduce las claves restantes a etiquetas legibles.
+    _hidden = {"signature_path"}
     db.add(
         CaseActivity(
             case_id=obj.id,
             author_id=actor_id,
             action="updated",
-            notes=", ".join(f"{k}={v}" for k, v in data.items()),
+            notes=", ".join(f"{k}={v}" for k, v in data.items() if k not in _hidden),
         )
     )
     await db.flush()

@@ -7,6 +7,7 @@
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
   import DatePicker from '$lib/components/DatePicker.svelte';
+  import { ClipboardList, UserCog } from 'lucide-svelte';
   import { casesApi } from '$lib/modules/cases/api';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
@@ -85,9 +86,9 @@
   }
 </script>
 
-<form on:submit={onSubmit} class="grid gap-4 lg:grid-cols-3">
+<form on:submit={onSubmit} class="animate-fade-up grid gap-4 lg:grid-cols-3">
   <div class="min-w-0 lg:col-span-2">
-    <Card title="Datos del caso">
+    <Card title="Datos del caso" description="Describe la falla o el trabajo a realizar" icon={ClipboardList} accent="amber">
       <div class="grid gap-4">
         <Input label="Título *" bind:value={form.title} required placeholder="Ventilador no enciende" />
         <Textarea label="Descripción" bind:value={form.description} rows={4} placeholder="Detalle del problema, contexto, antecedentes…" />
@@ -120,7 +121,7 @@
   </div>
 
   <div>
-    <Card title="Asignación">
+    <Card title="Asignación" description="Equipo, unidad e ingeniero" icon={UserCog} accent="brand">
       <div class="grid gap-4">
         <Select
           label="Equipo *"

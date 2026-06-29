@@ -45,8 +45,8 @@
   afterNavigate(() => closeSidebar());
 </script>
 
-<!-- Sidebar fijo en desktop (md+) -->
-<aside class="hidden w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
+<!-- Sidebar fijo en desktop (md+): pegado a la pantalla al hacer scroll -->
+<aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
   <div class="flex h-16 shrink-0 items-center gap-2 px-5">
     <div class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 font-bold text-white">B</div>
     <div>

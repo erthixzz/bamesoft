@@ -21,6 +21,10 @@
     UserCog,
     Wrench,
     ShieldAlert,
+    PlusCircle,
+    PencilLine,
+    MessageSquare,
+    Activity,
   } from 'lucide-svelte';
 
   import Card from '$lib/components/Card.svelte';
@@ -54,6 +58,8 @@
     STATUS_META,
     PRIORITY_META,
     elapsedBetween,
+    actionLabel,
+    parseActivityNote,
   } from '$lib/modules/cases/ui';
   import { formatDateTime, formatBytes } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
@@ -118,6 +124,19 @@
         { label: 'Cerrado', at: c.closed_at },
       ]
     : [];
+
+  const ACTION_ICON: Record<string, typeof Activity> = {
+    created: PlusCircle,
+    updated: PencilLine,
+    accepted: HandMetal,
+    note: MessageSquare,
+  };
+  const ACTION_TONE: Record<string, string> = {
+    created: 'bg-brand-50 text-brand-600',
+    updated: 'bg-amber-50 text-amber-600',
+    accepted: 'bg-violet-50 text-violet-600',
+    note: 'bg-slate-100 text-slate-500',
+  };
 
   async function safe<T>(p: Promise<T>): Promise<T | null> {
     try {
@@ -407,18 +426,18 @@
 {:else if c}
   <!-- Hero del caso -->
   <div class="animate-fade-up mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50">
-    <div class="bg-grid bg-gradient-to-br from-slate-50 to-white p-5">
-      <div class="flex flex-wrap items-start justify-between gap-3">
+    <div class="bg-grid bg-gradient-to-br from-slate-50 to-white p-4">
+      <div class="flex flex-wrap items-start justify-between gap-2">
         <div class="min-w-0">
-          <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 font-mono text-xs font-semibold tracking-wide text-white">
+          <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-white">
             {c.code}
           </span>
-          <h1 class="mt-2 text-xl font-bold text-slate-900 sm:text-2xl">{c.title}</h1>
+          <h1 class="mt-1.5 text-lg font-bold leading-tight text-slate-900 sm:text-xl">{c.title}</h1>
           {#if c.description}
-            <p class="mt-1 max-w-2xl text-sm text-slate-500">{c.description}</p>
+            <p class="mt-0.5 max-w-2xl text-sm text-slate-500">{c.description}</p>
           {/if}
         </div>
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-wrap gap-1.5">
           <CaseStatusBadge status={c.status} />
           <PriorityBadge priority={c.priority} />
           <span class="badge bg-slate-100 text-slate-700">{TYPE_LABEL[c.type]}</span>
@@ -430,19 +449,19 @@
         </div>
       </div>
 
-      <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
+      <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {#each [{ icon: Wrench, label: 'Equipo', value: equipmentLabel }, { icon: Building2, label: 'Unidad', value: sectorName }, { icon: User, label: 'Reportó', value: reporterName }, { icon: UserCog, label: 'Atiende', value: assigneeName }] as f}
-          <div class="rounded-xl border border-slate-100 bg-white/70 p-3 backdrop-blur">
+          <div class="rounded-lg border border-slate-100 bg-white/70 px-3 py-2 backdrop-blur">
             <div class="section-label flex items-center gap-1.5">
               <svelte:component this={f.icon} class="h-3.5 w-3.5" />{f.label}
             </div>
-            <p class="mt-1 truncate text-sm font-medium text-slate-800" title={f.value}>{f.value}</p>
+            <p class="mt-0.5 truncate text-sm font-medium text-slate-800" title={f.value}>{f.value}</p>
           </div>
         {/each}
       </div>
 
       {#if isEngineer && c.status !== 'closed' && c.status !== 'cancelled'}
-        <div class="mt-4 flex flex-wrap gap-2">
+        <div class="mt-3 flex flex-wrap gap-2">
           {#if !c.accepted_at}
             <Button on:click={takeCase} loading={accepting}><HandMetal class="h-4 w-4" /> Tomar caso</Button>
           {/if}
@@ -606,21 +625,41 @@
     <!-- Columna lateral: bitácora + nota -->
     <div class="space-y-4">
       <Card title="Bitácora" description="Histórico de actividades del caso" icon={History} accent="slate">
-        <ul class="space-y-3">
-          {#each activities as a}
-            <li class="rounded-lg border border-slate-100 bg-slate-50/60 px-3 py-2">
-              <div class="flex items-center justify-between gap-2">
-                <span class="text-sm font-medium capitalize text-slate-800">{a.action}</span>
-                <span class="shrink-0 text-[11px] text-slate-400">{formatDateTime(a.created_at)}</span>
+        <ol class="space-y-1">
+          {#each activities as a, i (a.id)}
+            {@const pairs = parseActivityNote(a.notes)}
+            <li class="flex gap-3">
+              <div class="flex flex-col items-center">
+                <span class="grid h-7 w-7 shrink-0 place-items-center rounded-full {ACTION_TONE[a.action] ?? 'bg-slate-100 text-slate-500'}">
+                  <svelte:component this={ACTION_ICON[a.action] ?? Activity} class="h-3.5 w-3.5" />
+                </span>
+                {#if i < activities.length - 1}
+                  <span class="my-1 w-px flex-1 bg-slate-200"></span>
+                {/if}
               </div>
-              {#if a.notes}
-                <p class="mt-0.5 text-sm text-slate-600">{a.notes}</p>
-              {/if}
+              <div class="min-w-0 pb-3">
+                <div class="flex flex-wrap items-center justify-between gap-x-2">
+                  <span class="text-sm font-semibold text-slate-800">{actionLabel(a.action)}</span>
+                  <span class="shrink-0 text-[11px] text-slate-400">{formatDateTime(a.created_at)}</span>
+                </div>
+                {#if pairs && pairs.length}
+                  <ul class="mt-1.5 flex flex-wrap gap-1.5">
+                    {#each pairs as p}
+                      <li class="inline-flex items-center gap-1 rounded-md bg-slate-50 px-2 py-0.5 text-xs ring-1 ring-slate-100">
+                        <span class="text-slate-400">{p.label}:</span>
+                        <span class="font-medium text-slate-700">{p.value}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {:else if a.action === 'note' && a.notes}
+                  <p class="mt-0.5 text-sm text-slate-600">{a.notes}</p>
+                {/if}
+              </div>
             </li>
           {:else}
             <li class="value-pending">Aún no hay actividad registrada.</li>
           {/each}
-        </ul>
+        </ol>
       </Card>
 
       <Card title="Añadir nota" icon={MessageSquarePlus} accent="brand">

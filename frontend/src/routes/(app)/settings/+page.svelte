@@ -5,7 +5,7 @@
   import { profile, logout } from '$lib/stores/auth';
   import { ROLE_LABELS } from '$lib/utils/permissions';
   import { setPageTitle } from '$lib/stores/page';
-  import { Settings, Mail, Building2, ShieldCheck, LogOut } from 'lucide-svelte';
+  import { Settings, Mail, Building2, ShieldCheck, LogOut, UserCircle } from 'lucide-svelte';
 
   onMount(() => setPageTitle('Ajustes'));
 
@@ -17,9 +17,9 @@
 
 <PageHeader title="Ajustes" subtitle="Tu cuenta y preferencias" icon={Settings} gradient="brand" />
 
-<div class="grid gap-4 lg:grid-cols-3">
+<div class="animate-fade-up grid gap-4 lg:grid-cols-3">
   <div class="lg:col-span-2">
-    <Card title="Perfil">
+    <Card title="Perfil" description="Tu información en la plataforma" icon={UserCircle} accent="brand">
       {#if $profile}
         <div class="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div class="grid h-16 w-16 shrink-0 place-items-center rounded-2xl bg-gradient-to-br from-brand-600 to-cyan-500 text-2xl font-bold text-white shadow-md">
@@ -39,7 +39,11 @@
                 <dt class="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
                   <Building2 class="h-3.5 w-3.5" /> Clínica
                 </dt>
-                <dd class="truncate text-sm text-slate-700">{$profile.clinic_name ?? '—'}</dd>
+                {#if $profile.clinic_name}
+                  <dd class="truncate text-sm text-slate-700">{$profile.clinic_name}</dd>
+                {:else}
+                  <dd class="value-pending">Sin compañía asignada</dd>
+                {/if}
               </div>
               <div>
                 <dt class="flex items-center gap-2 text-xs uppercase tracking-wider text-slate-500">
@@ -58,7 +62,7 @@
     </Card>
   </div>
 
-  <Card title="Sesión">
+  <Card title="Sesión" description="Cierre de sesión seguro" icon={LogOut} accent="rose">
     <p class="text-sm text-slate-600">
       Cerrar sesión limpia los datos en este dispositivo. Tendrás que volver a entrar con tu email y contraseña.
     </p>

@@ -184,6 +184,75 @@ export function slaInfo(c: Case): SlaInfo {
   return { state: 'ok', label: `${formatAge(hoursLeft)} restantes`, hoursLeft };
 }
 
+// ---- Bitácora: traducción de acciones y notas a lenguaje legible ----------
+
+/** Etiqueta en español para cada acción de la bitácora. */
+export const ACTION_LABEL: Record<string, string> = {
+  created: 'Caso creado',
+  updated: 'Actualización del caso',
+  accepted: 'Tomado por el ingeniero',
+  note: 'Nota',
+};
+
+export function actionLabel(action: string): string {
+  return ACTION_LABEL[action] ?? action;
+}
+
+const FIELD_LABEL: Record<string, string> = {
+  status: 'Estado',
+  priority: 'Prioridad',
+  type: 'Tipo',
+  completion: 'Estado final',
+  operation_minutes: 'Tiempo de operación',
+  work_performed: 'Actividad realizada',
+  parts_count: 'N.º de repuestos',
+  parts_detail: 'Detalle de repuestos',
+  receiver_name: 'Recibe',
+  receiver_doc: 'Documento',
+  title: 'Título',
+  description: 'Descripción',
+};
+
+// Campos técnicos/ids que no aportan a un humano leyendo la bitácora.
+const FIELD_HIDDEN = new Set([
+  'signature_path',
+  'assigned_to',
+  'sector_id',
+  'sla_due_at',
+  'equipment_id',
+]);
+
+function humanValue(key: string, raw: string): string {
+  const v = raw.trim();
+  if (key === 'status') return STATUS_META[v as CaseStatus]?.label ?? v;
+  if (key === 'completion') return COMPLETION_LABEL[v as CaseCompletion] ?? v;
+  if (key === 'type') return TYPE_LABEL[v as CaseType] ?? v;
+  if (key === 'priority') return PRIORITY_META[v as CasePriority]?.label ?? v;
+  if (key === 'operation_minutes') return `${v} min`;
+  return v.length > 80 ? `${v.slice(0, 80)}…` : v;
+}
+
+export interface NotePair {
+  label: string;
+  value: string;
+}
+
+/** Convierte una nota cruda ("k=v, k=v") en pares legibles en español.
+ *  Devuelve `null` si la nota no tiene ese formato (texto libre / nota manual). */
+export function parseActivityNote(notes: string | null): NotePair[] | null {
+  if (!notes) return null;
+  if (!/\w+=/.test(notes)) return null; // texto libre (nota, "Caso creado", …)
+  const pairs: NotePair[] = [];
+  const re = /(\w+)=(.*?)(?=,\s\w+=|$)/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(notes)) !== null) {
+    const key = m[1];
+    if (FIELD_HIDDEN.has(key)) continue;
+    pairs.push({ label: FIELD_LABEL[key] ?? key, value: humanValue(key, m[2]) });
+  }
+  return pairs;
+}
+
 /** Diferencia humana entre dos instantes ISO; "—" si falta alguno. */
 export function elapsedBetween(
   from: string | null | undefined,

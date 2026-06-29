@@ -8,7 +8,24 @@
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import EquipmentEditModal from '$lib/modules/equipment/components/EquipmentEditModal.svelte';
-  import { Pencil, FileUp, Copy, ExternalLink, Download, FileText } from 'lucide-svelte';
+  import {
+    Pencil,
+    FileUp,
+    Copy,
+    ExternalLink,
+    Download,
+    FileText,
+    Building2,
+    Barcode,
+    ShieldAlert,
+    CalendarClock,
+    Stethoscope,
+    QrCode,
+    StickyNote,
+    Wrench,
+    Gauge,
+    FolderOpen,
+  } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
   import { publicQrPngUrl } from '$lib/modules/public/api';
@@ -104,32 +121,60 @@
 {:else if error || !eq}
   <p class="text-danger-600">{error ?? 'No se encontró'}</p>
 {:else}
-  <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end">
-    <a class="btn-secondary text-center" href={`/equipment/${eq.id}/hoja-de-vida`}>
-      <FileText class="h-4 w-4" /> Hoja de vida
-    </a>
-    <a class="btn-secondary text-center" href={`/cases/new?equipment_id=${eq.id}`}>+ Caso para este equipo</a>
-    <Button on:click={() => (editOpen = true)}>
-      <Pencil class="h-4 w-4" /> Editar
-    </Button>
+  <!-- Hero del equipo -->
+  <div class="animate-fade-up mb-4 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/50">
+    <div class="bg-grid bg-gradient-to-br from-slate-50 to-white p-4">
+      <div class="flex flex-wrap items-start justify-between gap-2">
+        <div class="min-w-0">
+          <span class="inline-flex items-center rounded-md bg-slate-900 px-2 py-0.5 font-mono text-[11px] font-semibold tracking-wide text-white">
+            {eq.code}
+          </span>
+          <h1 class="mt-1.5 text-lg font-bold leading-tight text-slate-900 sm:text-xl">{eq.name}</h1>
+          <p class="mt-0.5 text-sm text-slate-500">{eq.brand ?? 'Sin marca'} · {eq.model ?? 'Sin modelo'}</p>
+        </div>
+        <StatusBadge status={eq.status} />
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {#each [{ icon: Building2, label: 'Unidad', value: sectorLabel }, { icon: Barcode, label: 'Serial', value: eq.serial_number || 'Sin serial' }, { icon: ShieldAlert, label: 'Riesgo', value: eq.risk_class || 'Sin clasificar' }, { icon: CalendarClock, label: 'Garantía', value: formatDate(eq.warranty_until) }] as f}
+          <div class="rounded-lg border border-slate-100 bg-white/70 px-3 py-2 backdrop-blur">
+            <div class="section-label flex items-center gap-1.5">
+              <svelte:component this={f.icon} class="h-3.5 w-3.5" />{f.label}
+            </div>
+            <p class="mt-0.5 truncate text-sm font-medium text-slate-800" title={f.value}>{f.value}</p>
+          </div>
+        {/each}
+      </div>
+
+      <div class="mt-3 flex flex-wrap gap-2">
+        <Button on:click={() => (editOpen = true)}><Pencil class="h-4 w-4" /> Editar</Button>
+        <a class="btn-secondary" href={`/equipment/${eq.id}/hoja-de-vida`}><FileText class="h-4 w-4" /> Hoja de vida</a>
+        <a class="btn-secondary" href={`/cases/new?equipment_id=${eq.id}`}><Wrench class="h-4 w-4" /> Caso para este equipo</a>
+      </div>
+    </div>
   </div>
 
   <div class="grid gap-4 lg:grid-cols-3">
-    <Card title="Información general">
+    <Card title="Información general" icon={Stethoscope} accent="brand">
       <dl class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
         <dt class="text-slate-500">Código</dt><dd class="font-medium">{eq.code}</dd>
-        <dt class="text-slate-500">Estado</dt><dd><StatusBadge status={eq.status} /></dd>
-        <dt class="text-slate-500">Marca</dt><dd>{eq.brand ?? '—'}</dd>
-        <dt class="text-slate-500">Modelo</dt><dd>{eq.model ?? '—'}</dd>
-        <dt class="text-slate-500">Serial</dt><dd>{eq.serial_number ?? '—'}</dd>
+        <dt class="text-slate-500">Marca</dt>
+        <dd>{#if eq.brand}{eq.brand}{:else}<span class="value-pending">Sin marca</span>{/if}</dd>
+        <dt class="text-slate-500">Modelo</dt>
+        <dd>{#if eq.model}{eq.model}{:else}<span class="value-pending">Sin modelo</span>{/if}</dd>
+        <dt class="text-slate-500">Fabricante</dt>
+        <dd>{#if eq.manufacturer}{eq.manufacturer}{:else}<span class="value-pending">Sin registrar</span>{/if}</dd>
         <dt class="text-slate-500">Unidad de servicio</dt><dd>{sectorLabel}</dd>
-        <dt class="text-slate-500">Riesgo</dt><dd>{eq.risk_class ?? '—'}</dd>
-        <dt class="text-slate-500">Adquirido</dt><dd>{formatDate(eq.acquisition_date)}</dd>
-        <dt class="text-slate-500">Garantía</dt><dd>{formatDate(eq.warranty_until)}</dd>
+        <dt class="text-slate-500">Riesgo</dt>
+        <dd>{#if eq.risk_class}{eq.risk_class}{:else}<span class="value-pending">Sin clasificar</span>{/if}</dd>
+        <dt class="text-slate-500">Adquirido</dt>
+        <dd>{#if eq.acquisition_date}{formatDate(eq.acquisition_date)}{:else}<span class="value-pending">Sin fecha</span>{/if}</dd>
+        <dt class="text-slate-500">Garantía</dt>
+        <dd>{#if eq.warranty_until}{formatDate(eq.warranty_until)}{:else}<span class="value-pending">Sin fecha</span>{/if}</dd>
       </dl>
     </Card>
 
-    <Card title="QR público">
+    <Card title="QR público" icon={QrCode} accent="cyan">
       <img
         alt={`QR de ${eq.code}`}
         src={publicQrPngUrl(eq.code, eq.qr_token)}
@@ -157,13 +202,17 @@
       </div>
     </Card>
 
-    <Card title="Notas">
-      <p class="whitespace-pre-wrap text-sm text-slate-700">{eq.notes ?? 'Sin notas.'}</p>
+    <Card title="Notas" icon={StickyNote} accent="slate">
+      {#if eq.notes}
+        <p class="whitespace-pre-wrap text-sm text-slate-700">{eq.notes}</p>
+      {:else}
+        <p class="value-pending">Sin notas registradas.</p>
+      {/if}
     </Card>
   </div>
 
   <div class="mt-6 grid gap-4 lg:grid-cols-2">
-    <Card title={`Casos (${cases.length})`}>
+    <Card title={`Casos (${cases.length})`} icon={Wrench} accent="amber">
       <ul class="space-y-2">
         {#each cases as c}
           <li class="flex items-center justify-between border-b border-slate-100 py-2 last:border-0">
@@ -173,12 +222,12 @@
             <CaseStatusBadge status={c.status} />
           </li>
         {:else}
-          <li class="text-sm text-slate-400">Sin casos.</li>
+          <li class="value-pending">Sin casos asociados.</li>
         {/each}
       </ul>
     </Card>
 
-    <Card title={`Mantenimientos preventivos (${pms.length})`}>
+    <Card title={`Mantenimientos preventivos (${pms.length})`} icon={CalendarClock} accent="emerald">
       <ul class="space-y-2 text-sm">
         {#each pms as p}
           <li class="flex justify-between border-b border-slate-100 py-2 last:border-0">
@@ -186,12 +235,12 @@
             <span class="text-slate-500">próximo: {formatDate(p.next_due_at)}</span>
           </li>
         {:else}
-          <li class="text-slate-400">Sin programación.</li>
+          <li class="value-pending">Sin programación.</li>
         {/each}
       </ul>
     </Card>
 
-    <Card title={`Calibraciones (${cals.length})`}>
+    <Card title={`Calibraciones (${cals.length})`} icon={Gauge} accent="violet">
       <ul class="space-y-2 text-sm">
         {#each cals as c}
           <li class="flex justify-between border-b border-slate-100 py-2 last:border-0">
@@ -201,28 +250,27 @@
             </span>
           </li>
         {:else}
-          <li class="text-slate-400">Sin registros.</li>
+          <li class="value-pending">Sin registros.</li>
         {/each}
       </ul>
     </Card>
 
-    <Card>
-      <div slot="actions">
+    <Card title={`Documentos (${docs.length})`} icon={FolderOpen} accent="cyan">
+      <svelte:fragment slot="actions">
         <label class="btn-secondary inline-flex cursor-pointer items-center gap-2">
           <FileUp class="h-4 w-4" />
-          {uploading ? 'Subiendo…' : 'Subir documento'}
+          {uploading ? 'Subiendo…' : 'Subir'}
           <input type="file" class="hidden" on:change={onFile} disabled={uploading} />
         </label>
-      </div>
-      <h3 class="text-base font-semibold">Documentos ({docs.length})</h3>
-      <ul class="mt-3 space-y-2 text-sm">
+      </svelte:fragment>
+      <ul class="space-y-2 text-sm">
         {#each docs as d}
           <li class="flex justify-between border-b border-slate-100 py-2 last:border-0">
             <span>{d.title} <span class="text-xs text-slate-400">({d.type})</span></span>
             <span class="text-slate-500">{formatDate(d.created_at)}</span>
           </li>
         {:else}
-          <li class="text-slate-400">Sin documentos.</li>
+          <li class="value-pending">Sin documentos.</li>
         {/each}
       </ul>
     </Card>

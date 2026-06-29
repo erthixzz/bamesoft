@@ -91,7 +91,7 @@
 
   <!-- Productividad por ingeniero -->
   <div class="mt-4">
-    <Card title="Productividad por ingeniero" description="Atención, completitud, tiempos de respuesta y FCR en el rango.">
+    <Card title="Productividad por ingeniero" description="Atención, completitud, tiempos de respuesta y FCR en el rango." icon={Users} accent="emerald">
       {#if !prod || prod.items.length === 0}
         <EmptyState icon={Users} title="Sin datos en el rango" description="No hay casos atendidos por ingenieros en las fechas seleccionadas." />
       {:else}
@@ -131,7 +131,7 @@
 
   <div class="mt-4 grid gap-4 lg:grid-cols-2">
     <!-- Llamadas por día -->
-    <Card title="Llamadas por día" description="Casos reportados (azul) vs. cerrados (verde).">
+    <Card title="Llamadas por día" description="Casos reportados (azul) vs. cerrados (verde)." icon={PhoneCall} accent="cyan">
       {#if !ops || ops.daily.length === 0}
         <EmptyState icon={PhoneCall} title="Sin actividad" description="No hay casos reportados en el rango seleccionado." />
       {:else}
@@ -150,7 +150,7 @@
     </Card>
 
     <!-- Quién reportó la llamada -->
-    <Card title="Quién atendió la llamada" description="Casos reportados por usuario en el rango.">
+    <Card title="Quién atendió la llamada" description="Casos reportados por usuario en el rango." icon={Users} accent="violet">
       {#if !ops || ops.by_reporter.length === 0}
         <EmptyState icon={Users} title="Sin reportantes" description="No hay casos reportados en el rango." />
       {:else}
@@ -173,7 +173,7 @@
 
   <!-- Cumplimiento normativo -->
   <div class="mt-4">
-    <Card title="Cumplimiento por norma" description="Cobertura de las normas aplicables al inventario.">
+    <Card title="Cumplimiento por norma" description="Cobertura de las normas aplicables al inventario." icon={FileBarChart} accent="brand">
       {#if !compliance || compliance.items.length === 0}
         <EmptyState
           icon={FileBarChart}

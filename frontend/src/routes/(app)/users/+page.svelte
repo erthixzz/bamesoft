@@ -125,7 +125,7 @@
 
 <!-- Matriz de permisos por rol -->
 <div class="mt-4">
-  <Card title="Permisos por rol" description="Qué puede hacer cada rol en la plataforma.">
+  <Card title="Permisos por rol" description="Qué puede hacer cada rol en la plataforma." icon={ShieldCheck} accent="violet">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="text-left text-xs uppercase text-slate-500">

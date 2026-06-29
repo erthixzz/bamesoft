@@ -7,6 +7,7 @@
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
   import DatePicker from '$lib/components/DatePicker.svelte';
+  import { Stethoscope, StickyNote, MapPin } from 'lucide-svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { clinicsApi } from '$lib/modules/clinics/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
@@ -90,9 +91,9 @@
   }
 </script>
 
-<form on:submit={onSubmit} class="grid gap-4 lg:grid-cols-3">
+<form on:submit={onSubmit} class="animate-fade-up grid gap-4 lg:grid-cols-3">
   <div class="min-w-0 lg:col-span-2">
-    <Card title="Información del equipo">
+    <Card title="Información del equipo" description="Identificación y clasificación" icon={Stethoscope} accent="brand">
       <div class="grid gap-4 sm:grid-cols-2">
         <Input label="Código *" bind:value={form.code} required placeholder="EQ-0010" />
         <Input label="Nombre *" bind:value={form.name} required placeholder="Monitor Mindray uMEC12" />
@@ -121,14 +122,14 @@
     </Card>
 
     <div class="mt-4">
-      <Card title="Notas">
+      <Card title="Notas" icon={StickyNote} accent="slate">
         <Textarea bind:value={form.notes} placeholder="Notas internas, observaciones, advertencias…" />
       </Card>
     </div>
   </div>
 
   <div>
-    <Card title="Ubicación y estado">
+    <Card title="Ubicación y estado" description="Clínica, unidad y disponibilidad" icon={MapPin} accent="cyan">
       <div class="grid gap-4">
         <Select
           label="Clínica *"
