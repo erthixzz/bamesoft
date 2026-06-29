@@ -1,6 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
+  import { get } from 'svelte/store';
   import Card from '$lib/components/Card.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -43,6 +45,21 @@
     }
   }
 
+  // Equipos de la unidad seleccionada (el equipo depende del sector).
+  $: equipmentForSector = form.sector_id
+    ? equipment.filter((e) => e.sector_id === form.sector_id)
+    : [];
+
+  // Al cambiar de unidad, limpiar el equipo si ya no pertenece a ella.
+  function onSectorChange() {
+    if (
+      form.equipment_id &&
+      !equipment.some((e) => e.id === form.equipment_id && e.sector_id === form.sector_id)
+    ) {
+      form.equipment_id = '';
+    }
+  }
+
   onMount(async () => {
     setPageTitle('Nuevo caso');
     try {
@@ -56,6 +73,20 @@
       engineers = all.filter((u) =>
         ['admin', 'engineer', 'service', 'support'].includes(u.role),
       );
+
+      // Preselección desde parámetros (equipo concreto o unidad).
+      const params = get(page).url.searchParams;
+      const eqId = params.get('equipment_id');
+      const secId = params.get('sector_id');
+      if (eqId) {
+        const e = equipment.find((x) => x.id === eqId);
+        if (e) {
+          form.sector_id = e.sector_id ?? '';
+          form.equipment_id = e.id;
+        }
+      } else if (secId) {
+        form.sector_id = secId;
+      }
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'Error cargando datos');
     }
@@ -121,27 +152,40 @@
   </div>
 
   <div>
-    <Card title="Asignación" description="Equipo, unidad e ingeniero" icon={UserCog} accent="brand">
+    <Card title="Asignación" description="Unidad, equipo e ingeniero" icon={UserCog} accent="brand">
       <div class="grid gap-4">
         <Select
-          label="Equipo *"
-          bind:value={form.equipment_id}
-          required
-          options={equipment.map((e) => ({ value: e.id, label: `${e.code} · ${e.name}` }))}
-        />
-        <Select
-          label="Sector"
+          label="Unidad de servicio *"
           bind:value={form.sector_id}
-          options={sectors.map((s) => ({ value: s.id, label: `${s.code} · ${s.name}` }))}
+          required
+          on:change={onSectorChange}
+          options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+          placeholder="— Selecciona la unidad —"
         />
+        <div>
+          <Select
+            label="Equipo *"
+            bind:value={form.equipment_id}
+            required
+            disabled={!form.sector_id}
+            options={equipmentForSector.map((e) => ({ value: e.id, label: `${e.code} · ${e.name}` }))}
+            placeholder={form.sector_id ? '— Selecciona el equipo —' : 'Elige primero una unidad'}
+          />
+          {#if form.sector_id && equipmentForSector.length === 0}
+            <p class="mt-1 text-xs text-amber-600">
+              Esta unidad no tiene equipos.
+              <a class="font-medium underline" href={`/equipment/new?sector_id=${form.sector_id}`}>Añadir equipo</a>
+            </p>
+          {/if}
+        </div>
         <Select
           label="Asignar a ingeniero"
           bind:value={form.assigned_to}
           options={engineers.map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` }))}
         />
         <p class="text-xs text-slate-500">
-          Si dejas el ingeniero en blanco y eliges sector, se asigna automáticamente al
-          ingeniero por defecto del sector.
+          Si dejas el ingeniero en blanco, se asigna automáticamente al ingeniero por
+          defecto de la unidad (si tiene uno).
         </p>
         <DatePicker label="SLA (fecha límite)" mode="datetime" bind:value={form.sla_due_at} />
       </div>

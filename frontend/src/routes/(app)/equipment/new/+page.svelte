@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import Card from '$lib/components/Card.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -57,6 +58,9 @@
     setPageTitle('Nuevo equipo');
     [clinics, categories] = await Promise.all([clinicsApi.list(), equipmentApi.categories()]);
     if (!form.clinic_id && clinics[0]) form.clinic_id = clinics[0].id;
+    // Preseleccionar la unidad de servicio si se llegó desde una unidad concreta.
+    const sid = get(page).url.searchParams.get('sector_id');
+    if (sid) form.sector_id = sid;
   });
 
   async function onSubmit(e: SubmitEvent) {

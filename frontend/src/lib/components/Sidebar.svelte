@@ -19,6 +19,7 @@
     Users,
     Settings,
     HelpCircle,
+    Building2,
     X,
   } from 'lucide-svelte';
 
@@ -29,6 +30,7 @@
   const items: { href: string; label: string; icon: typeof Wrench; roles?: UserRole[] }[] = [
     { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'engineer', 'support'] },
     { href: '/equipment', label: 'Equipos', icon: QrCode },
+    { href: '/sectors', label: 'Unidades de servicio', icon: Building2, roles: ['admin', 'engineer'] },
     { href: '/cases', label: 'Casos', icon: Wrench },
     { href: '/alerts', label: 'Alertas', icon: AlertTriangle },
     { href: '/documents', label: 'Documentos', icon: FileText },
