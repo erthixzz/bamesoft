@@ -20,15 +20,22 @@ async def list_sectors(
     return (await db.execute(stmt)).scalars().all()
 
 
-async def get_sector(db: AsyncSession, sector_id: uuid.UUID) -> Sector:
+async def get_sector(
+    db: AsyncSession, sector_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Sector:
     obj = await db.get(Sector, sector_id)
-    if obj is None:
+    if obj is None or (scope is not None and obj.clinic_id != scope):
         raise NotFound("Sector")
     return obj
 
 
-async def create(db: AsyncSession, payload: SectorCreate) -> Sector:
-    obj = Sector(**payload.model_dump())
+async def create(
+    db: AsyncSession, payload: SectorCreate, scope: uuid.UUID | None = None
+) -> Sector:
+    data = payload.model_dump()
+    if scope is not None:
+        data["clinic_id"] = scope
+    obj = Sector(**data)
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
@@ -36,9 +43,9 @@ async def create(db: AsyncSession, payload: SectorCreate) -> Sector:
 
 
 async def update(
-    db: AsyncSession, sector_id: uuid.UUID, payload: SectorUpdate
+    db: AsyncSession, sector_id: uuid.UUID, payload: SectorUpdate, scope: uuid.UUID | None = None
 ) -> Sector:
-    obj = await get_sector(db, sector_id)
+    obj = await get_sector(db, sector_id, scope)
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(obj, k, v)
     await db.flush()

@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db.session import get_session
 from app.modules.alerts import service
 from app.modules.alerts.schemas import AlertCreate, AlertOut
-from app.modules.auth.deps import require_authenticated, require_engineer, require_staff
+from app.modules.auth.deps import (
+    clinic_scope,
+    require_authenticated,
+    require_engineer,
+    require_staff,
+)
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/alerts", tags=["alerts"])
@@ -19,9 +24,13 @@ async def list_alerts(
     only_active: bool = True,
     limit: int = 100,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return list(await service.list_alerts(db, only_active=only_active, limit=limit))
+    return list(
+        await service.list_alerts(
+            db, only_active=only_active, scope=clinic_scope(current), limit=limit
+        )
+    )
 
 
 @router.post("", response_model=AlertOut, status_code=status.HTTP_201_CREATED)
@@ -37,18 +46,18 @@ async def create_alert(
 async def acknowledge(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_staff),
+    current: User = Depends(require_staff),
 ):
-    return await service.acknowledge(db, alert_id)
+    return await service.acknowledge(db, alert_id, clinic_scope(current))
 
 
 @router.post("/{alert_id}/resolve", response_model=AlertOut)
 async def resolve(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_staff),
+    current: User = Depends(require_staff),
 ):
-    return await service.resolve(db, alert_id)
+    return await service.resolve(db, alert_id, clinic_scope(current))
 
 
 @router.post("/sweep")

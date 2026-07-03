@@ -61,15 +61,23 @@ async def list_equipment(
     return (await db.execute(stmt)).scalars().all()
 
 
-async def get_equipment(db: AsyncSession, equipment_id: uuid.UUID) -> Equipment:
+async def get_equipment(
+    db: AsyncSession, equipment_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Equipment:
     obj = await db.get(Equipment, equipment_id)
     if obj is None:
         raise NotFound("Equipo")
+    if scope is not None and obj.clinic_id != scope:
+        raise NotFound("Equipo")  # no revelar existencia fuera de la clínica
     return obj
 
 
-async def get_by_code(db: AsyncSession, code: str) -> Equipment | None:
+async def get_by_code(
+    db: AsyncSession, code: str, scope: uuid.UUID | None = None
+) -> Equipment | None:
     stmt = select(Equipment).where(Equipment.code == code)
+    if scope is not None:
+        stmt = stmt.where(Equipment.clinic_id == scope)
     return (await db.execute(stmt)).scalar_one_or_none()
 
 
@@ -81,10 +89,15 @@ async def get_by_qr(db: AsyncSession, code: str, token: str) -> Equipment:
     return obj
 
 
-async def create_equipment(db: AsyncSession, payload: EquipmentCreate) -> Equipment:
+async def create_equipment(
+    db: AsyncSession, payload: EquipmentCreate, scope: uuid.UUID | None = None
+) -> Equipment:
     if await get_by_code(db, payload.code):
         raise Conflict("Ya existe un equipo con ese código")
-    obj = Equipment(**payload.model_dump(), qr_token=qr.new_token())
+    data = payload.model_dump()
+    if scope is not None:
+        data["clinic_id"] = scope  # el admin de clínica solo crea en la suya
+    obj = Equipment(**data, qr_token=qr.new_token())
     db.add(obj)
     await db.flush()
     await db.refresh(obj)
@@ -92,9 +105,12 @@ async def create_equipment(db: AsyncSession, payload: EquipmentCreate) -> Equipm
 
 
 async def update_equipment(
-    db: AsyncSession, equipment_id: uuid.UUID, payload: EquipmentUpdate
+    db: AsyncSession,
+    equipment_id: uuid.UUID,
+    payload: EquipmentUpdate,
+    scope: uuid.UUID | None = None,
 ) -> Equipment:
-    obj = await get_equipment(db, equipment_id)
+    obj = await get_equipment(db, equipment_id, scope)
     for k, v in payload.model_dump(exclude_unset=True).items():
         setattr(obj, k, v)
     await db.flush()
@@ -102,8 +118,10 @@ async def update_equipment(
     return obj
 
 
-async def regenerate_qr(db: AsyncSession, equipment_id: uuid.UUID) -> Equipment:
-    obj = await get_equipment(db, equipment_id)
+async def regenerate_qr(
+    db: AsyncSession, equipment_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Equipment:
+    obj = await get_equipment(db, equipment_id, scope)
     obj.qr_token = qr.new_token()
     await db.flush()
     await db.refresh(obj)
@@ -153,18 +171,23 @@ async def _build_life_sheet_out(
     )
 
 
-async def get_life_sheet(db: AsyncSession, equipment_id: uuid.UUID) -> LifeSheetOut:
+async def get_life_sheet(
+    db: AsyncSession, equipment_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> LifeSheetOut:
     """Devuelve la hoja de vida; si no existe aún, una estructura vacía."""
-    eq = await get_equipment(db, equipment_id)
+    eq = await get_equipment(db, equipment_id, scope)
     row = await _life_sheet_row(db, equipment_id)
     return await _build_life_sheet_out(db, eq, row)
 
 
 async def upsert_life_sheet(
-    db: AsyncSession, equipment_id: uuid.UUID, payload: LifeSheetUpdate
+    db: AsyncSession,
+    equipment_id: uuid.UUID,
+    payload: LifeSheetUpdate,
+    scope: uuid.UUID | None = None,
 ) -> LifeSheetOut:
     """Crea o actualiza la hoja de vida y sincroniza los campos compartidos."""
-    eq = await get_equipment(db, equipment_id)
+    eq = await get_equipment(db, equipment_id, scope)
 
     # Sincronizar campos compartidos hacia el equipo (sin nulear requeridos).
     for key, value in payload.shared.model_dump().items():

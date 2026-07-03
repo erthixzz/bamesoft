@@ -1,9 +1,10 @@
 """Reportes / KPIs."""
 from __future__ import annotations
 
+import uuid
 from datetime import UTC, date, datetime, timedelta
 
-from sqlalchemy import distinct, func, select, text
+from sqlalchemy import and_, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import CaseCompletion, CaseStatus
@@ -47,42 +48,52 @@ def _hours(seconds: float | None) -> float | None:
 
 # Una sola query SQL que devuelve todos los KPIs en columnas paralelas:
 # convertimos 9 roundtrips a Postgres en 1 solo viaje (~150 ms vs ~1.4 s).
+# `:scope::uuid is null` → sin filtro (super admin). Si trae un id, todo se
+# limita a esa clínica (los casos/mantenimientos/calibraciones vía su equipo).
 _DASHBOARD_SQL = text(
     """
     select
-      (select count(*) from equipment) as eq_total,
-      (select count(*) from equipment where status = 'operational') as eq_op,
-      (select count(*) from equipment where status = 'out_of_service') as eq_oos,
-      (select count(*) from cases where status = 'open') as cases_open,
-      (select count(*) from cases where status = 'in_progress') as cases_ip,
-      (select count(*) from cases
-        where status = 'closed' and closed_at >= :last_30) as cases_closed_30,
-      (select count(*) from maintenance_schedules
-        where next_due_at is not null and next_due_at <= :horizon) as pm_due,
-      (select count(*) from calibrations
-        where expires_at is not null and expires_at <= :horizon) as cal_due,
-      (select avg(extract(epoch from closed_at - opened_at)) from cases
-        where closed_at is not null and opened_at is not null) as avg_close_seconds
+      (select count(*) from equipment e where (:scope::uuid is null or e.clinic_id = :scope)) as eq_total,
+      (select count(*) from equipment e where e.status = 'operational' and (:scope::uuid is null or e.clinic_id = :scope)) as eq_op,
+      (select count(*) from equipment e where e.status = 'out_of_service' and (:scope::uuid is null or e.clinic_id = :scope)) as eq_oos,
+      (select count(*) from cases c join equipment e on e.id = c.equipment_id
+        where c.status = 'open' and (:scope::uuid is null or e.clinic_id = :scope)) as cases_open,
+      (select count(*) from cases c join equipment e on e.id = c.equipment_id
+        where c.status = 'in_progress' and (:scope::uuid is null or e.clinic_id = :scope)) as cases_ip,
+      (select count(*) from cases c join equipment e on e.id = c.equipment_id
+        where c.status = 'closed' and c.closed_at >= :last_30 and (:scope::uuid is null or e.clinic_id = :scope)) as cases_closed_30,
+      (select count(*) from maintenance_schedules ms join equipment e on e.id = ms.equipment_id
+        where ms.next_due_at is not null and ms.next_due_at <= :horizon and (:scope::uuid is null or e.clinic_id = :scope)) as pm_due,
+      (select count(*) from calibrations cal join equipment e on e.id = cal.equipment_id
+        where cal.expires_at is not null and cal.expires_at <= :horizon and (:scope::uuid is null or e.clinic_id = :scope)) as cal_due,
+      (select avg(extract(epoch from c.closed_at - c.opened_at)) from cases c join equipment e on e.id = c.equipment_id
+        where c.closed_at is not null and c.opened_at is not null and (:scope::uuid is null or e.clinic_id = :scope)) as avg_close_seconds
     """
 )
 
 
-async def dashboard(db: AsyncSession) -> DashboardKPIs:
+async def dashboard(db: AsyncSession, scope: uuid.UUID | None = None) -> DashboardKPIs:
     now = datetime.now(UTC)
     horizon = (now + timedelta(days=30)).date()
     last_30 = now - timedelta(days=30)
 
+    sp = str(scope) if scope is not None else None
     row = (
-        await db.execute(_DASHBOARD_SQL, {"horizon": horizon, "last_30": last_30})
+        await db.execute(
+            _DASHBOARD_SQL, {"horizon": horizon, "last_30": last_30, "scope": sp}
+        )
     ).one()
 
     avg_seconds = row.avg_close_seconds
     avg_hours = float(avg_seconds) / 3600.0 if avg_seconds else None
 
     # Desglose de casos por estado (todos los estados, con 0 si no hay).
-    status_rows = (
-        await db.execute(select(Case.status, func.count()).group_by(Case.status))
-    ).all()
+    status_stmt = select(Case.status, func.count())
+    if scope is not None:
+        status_stmt = status_stmt.join(Equipment, Equipment.id == Case.equipment_id).where(
+            Equipment.clinic_id == scope
+        )
+    status_rows = (await db.execute(status_stmt.group_by(Case.status))).all()
     cases_by_status = {s.value: 0 for s in CaseStatus}
     for st, cnt in status_rows:
         key = st.value if isinstance(st, CaseStatus) else str(st)
@@ -102,20 +113,37 @@ async def dashboard(db: AsyncSession) -> DashboardKPIs:
     )
 
 
-async def compliance(db: AsyncSession) -> ComplianceReport:
-    total_eq = await db.scalar(select(func.count(Equipment.id))) or 0
-    rows = (
-        await db.execute(
-            select(
-                Standard.code,
-                Standard.name,
-                func.count(distinct(EquipmentStandard.equipment_id)).label("with_eq"),
-            )
+async def compliance(db: AsyncSession, scope: uuid.UUID | None = None) -> ComplianceReport:
+    total_stmt = select(func.count(Equipment.id))
+    if scope is not None:
+        total_stmt = total_stmt.where(Equipment.clinic_id == scope)
+    total_eq = await db.scalar(total_stmt) or 0
+
+    if scope is None:
+        with_col = func.count(distinct(EquipmentStandard.equipment_id))
+        stmt = (
+            select(Standard.code, Standard.name, with_col.label("with_eq"))
             .join(EquipmentStandard, EquipmentStandard.standard_id == Standard.id, isouter=True)
             .group_by(Standard.id)
             .order_by(Standard.code)
         )
-    ).all()
+    else:
+        with_col = func.count(distinct(Equipment.id))
+        stmt = (
+            select(Standard.code, Standard.name, with_col.label("with_eq"))
+            .join(EquipmentStandard, EquipmentStandard.standard_id == Standard.id, isouter=True)
+            .join(
+                Equipment,
+                and_(
+                    Equipment.id == EquipmentStandard.equipment_id,
+                    Equipment.clinic_id == scope,
+                ),
+                isouter=True,
+            )
+            .group_by(Standard.id)
+            .order_by(Standard.code)
+        )
+    rows = (await db.execute(stmt)).all()
 
     items = [
         ComplianceItem(
@@ -130,8 +158,20 @@ async def compliance(db: AsyncSession) -> ComplianceReport:
     return ComplianceReport(items=items, total=len(items))
 
 
+def _scope_case(stmt, scope: uuid.UUID | None):
+    """Añade el aislamiento por clínica (vía el equipo del caso) a un select sobre Case."""
+    if scope is None:
+        return stmt
+    return stmt.join(Equipment, Equipment.id == Case.equipment_id).where(
+        Equipment.clinic_id == scope
+    )
+
+
 async def productivity(
-    db: AsyncSession, date_from: date | None = None, date_to: date | None = None
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
 ) -> ProductivityReport:
     """Productividad por ingeniero: atendidos, completados/incompletos, tiempos de
     respuesta de cada tramo del flujo y FCR (resueltos completos a la primera)."""
@@ -165,6 +205,7 @@ async def productivity(
         .group_by(Case.assigned_to, User.full_name)
         .order_by(func.count().desc())
     )
+    stmt = _scope_case(stmt, scope)
     rows = (await db.execute(stmt)).all()
 
     items: list[ProductivityRow] = []
@@ -202,7 +243,10 @@ async def productivity(
 
 
 async def operations(
-    db: AsyncSession, date_from: date | None = None, date_to: date | None = None
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
 ) -> OperationsReport:
     """Operación: llamadas reportadas/cerradas por día, incompletos, en espera y
     desglose por quién reportó (atendió la llamada)."""
@@ -210,24 +254,27 @@ async def operations(
 
     totals = (
         await db.execute(
-            select(
-                func.count().label("reported"),
-                func.count().filter(Case.status == CaseStatus.CLOSED).label("closed"),
-                func.count().filter(Case.completion == CaseCompletion.COMPLETE).label("complete"),
-                func.count().filter(Case.completion == CaseCompletion.INCOMPLETE).label("incomplete"),
-            ).where(*rng)
+            _scope_case(
+                select(
+                    func.count().label("reported"),
+                    func.count().filter(Case.status == CaseStatus.CLOSED).label("closed"),
+                    func.count().filter(Case.completion == CaseCompletion.COMPLETE).label("complete"),
+                    func.count().filter(Case.completion == CaseCompletion.INCOMPLETE).label("incomplete"),
+                ).where(*rng),
+                scope,
+            )
         )
     ).one()
 
     waiting_now = await db.scalar(
-        select(func.count()).where(Case.status.in_(_WAITING))
+        _scope_case(select(func.count()).select_from(Case).where(Case.status.in_(_WAITING)), scope)
     )
 
     # Reportados por día.
     day = func.date(_opened_col())
     rep_rows = (
         await db.execute(
-            select(day.label("d"), func.count().label("n")).where(*rng).group_by(day)
+            _scope_case(select(day.label("d"), func.count().label("n")).where(*rng), scope).group_by(day)
         )
     ).all()
     # Cerrados por día (sobre la fecha de cierre, dentro del mismo rango).
@@ -239,7 +286,7 @@ async def operations(
         cl_conds.append(cday <= date_to)
     cl_rows = (
         await db.execute(
-            select(cday.label("d"), func.count().label("n")).where(*cl_conds).group_by(cday)
+            _scope_case(select(cday.label("d"), func.count().label("n")).where(*cl_conds), scope).group_by(cday)
         )
     ).all()
 
@@ -252,16 +299,19 @@ async def operations(
         daily_map.setdefault(k, DailyPoint(day=k)).closed = r.n
     daily = [daily_map[k] for k in sorted(daily_map)]
 
+    rep_by_base = _scope_case(
+        select(
+            Case.reported_by.label("uid"),
+            User.full_name.label("name"),
+            func.count().label("n"),
+        )
+        .join(User, User.id == Case.reported_by, isouter=True)
+        .where(*rng),
+        scope,
+    )
     rep_by = (
         await db.execute(
-            select(
-                Case.reported_by.label("uid"),
-                User.full_name.label("name"),
-                func.count().label("n"),
-            )
-            .join(User, User.id == Case.reported_by, isouter=True)
-            .where(*rng)
-            .group_by(Case.reported_by, User.full_name)
+            rep_by_base.group_by(Case.reported_by, User.full_name)
             .order_by(func.count().desc())
             .limit(20)
         )

@@ -4,9 +4,13 @@
   import { profile, logout } from '$lib/stores/auth';
   import { pageTitle } from '$lib/stores/page';
   import { toggleSidebar } from '$lib/stores/sidebar';
+  import GlobalSearch from '$lib/components/GlobalSearch.svelte';
+  import ClinicSwitchModal from '$lib/modules/clinics/components/ClinicSwitchModal.svelte';
   import { ROLE_LABELS } from '$lib/utils/permissions';
   import { tooltip } from '$lib/actions/tooltip';
-  import { Building2, LogOut, Menu, ArrowLeft, ChevronRight } from 'lucide-svelte';
+  import { Building2, LogOut, Menu, ArrowLeft, ChevronRight, ChevronDown } from 'lucide-svelte';
+
+  let clinicSwitchOpen = false;
 
   // Etiquetas legibles por segmento de ruta para el breadcrumb.
   const LABELS: Record<string, string> = {
@@ -90,8 +94,29 @@
     <h1 class="truncate text-sm font-semibold text-slate-900 sm:hidden">{$pageTitle}</h1>
   </div>
 
+  <!-- Buscador global (centro en desktop, icono en móvil) -->
+  <div class="flex flex-1 items-center justify-end px-1 md:justify-center md:px-3">
+    <GlobalSearch />
+  </div>
+
   <div class="flex shrink-0 items-center gap-2 sm:gap-3">
-    {#if $profile?.clinic_name}
+    {#if $profile?.role === 'admin'}
+      <!-- Super admin: clic para cambiar de compañía activa -->
+      <button
+        type="button"
+        class="hidden items-center gap-2 rounded-full border border-brand-200/80 bg-gradient-to-r from-brand-50 to-cyan-50 py-1 pl-1.5 pr-2.5 shadow-sm transition hover:border-brand-400 hover:shadow md:flex"
+        on:click={() => (clinicSwitchOpen = true)}
+        use:tooltip={{ text: 'Cambiar de compañía', placement: 'bottom' }}
+      >
+        <span class="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-gradient-to-br from-brand-600 to-cyan-500 text-white shadow-sm">
+          <Building2 class="h-3.5 w-3.5" />
+        </span>
+        <span class="max-w-[180px] truncate text-sm font-semibold text-brand-800">
+          {$profile.clinic_name ?? 'Elegir compañía'}
+        </span>
+        <ChevronDown class="h-3.5 w-3.5 shrink-0 text-brand-400" />
+      </button>
+    {:else if $profile?.clinic_name}
       <div
         class="hidden items-center gap-2 rounded-full border border-brand-200/80 bg-gradient-to-r from-brand-50 to-cyan-50 py-1 pl-1.5 pr-3 shadow-sm md:flex"
       >
@@ -123,3 +148,5 @@
     {/if}
   </div>
 </header>
+
+<ClinicSwitchModal bind:open={clinicSwitchOpen} />

@@ -13,6 +13,7 @@ from app.core.errors import BadRequest, NotFound
 from app.db.enums import CaseStatus
 from app.modules.cases.models import Case, CaseActivity
 from app.modules.cases.schemas import CaseActivityIn, CaseCreate, CaseUpdate
+from app.modules.equipment.models import Equipment
 
 
 def _new_case_code() -> str:
@@ -25,10 +26,16 @@ async def list_cases(
     status: CaseStatus | None = None,
     assigned_to: uuid.UUID | None = None,
     equipment_id: uuid.UUID | None = None,
+    scope: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
 ) -> Sequence[Case]:
     stmt = select(Case).order_by(Case.created_at.desc())
+    if scope is not None:
+        # Aislar por clínica a través del equipo del caso.
+        stmt = stmt.join(Equipment, Equipment.id == Case.equipment_id).where(
+            Equipment.clinic_id == scope
+        )
     if status:
         stmt = stmt.where(Case.status == status)
     if assigned_to:
@@ -39,15 +46,27 @@ async def list_cases(
     return (await db.execute(stmt)).scalars().all()
 
 
-async def get_case(db: AsyncSession, case_id: uuid.UUID) -> Case:
+async def get_case(db: AsyncSession, case_id: uuid.UUID, scope: uuid.UUID | None = None) -> Case:
     obj = await db.get(Case, case_id)
     if obj is None:
         raise NotFound("Caso")
+    if scope is not None:
+        eq = await db.get(Equipment, obj.equipment_id)
+        if eq is None or eq.clinic_id != scope:
+            raise NotFound("Caso")
     return obj
 
 
-async def create_case(db: AsyncSession, payload: CaseCreate, reporter_id: uuid.UUID) -> Case:
+async def create_case(
+    db: AsyncSession, payload: CaseCreate, reporter_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Case:
     data = payload.model_dump()
+
+    # El equipo elegido debe pertenecer a la clínica del usuario (si está scoped).
+    if scope is not None:
+        eq = await db.get(Equipment, data["equipment_id"])
+        if eq is None or eq.clinic_id != scope:
+            raise NotFound("Equipo")
 
     # Si llega un sector pero no hay asignado, usar el ingeniero por defecto.
     if data.get("sector_id") and not data.get("assigned_to"):
@@ -85,8 +104,9 @@ async def update_case(
     case_id: uuid.UUID,
     payload: CaseUpdate,
     actor_id: uuid.UUID,
+    scope: uuid.UUID | None = None,
 ) -> Case:
-    obj = await get_case(db, case_id)
+    obj = await get_case(db, case_id, scope)
     data = payload.model_dump(exclude_unset=True)
     now = datetime.now(UTC)
 
@@ -122,9 +142,11 @@ async def update_case(
     return obj
 
 
-async def accept_case(db: AsyncSession, case_id: uuid.UUID, engineer_id: uuid.UUID) -> Case:
+async def accept_case(
+    db: AsyncSession, case_id: uuid.UUID, engineer_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Case:
     """El ingeniero toma el caso (sella `accepted_at`)."""
-    obj = await get_case(db, case_id)
+    obj = await get_case(db, case_id, scope)
     if obj.status in (CaseStatus.CLOSED, CaseStatus.CANCELLED):
         raise BadRequest("No se puede tomar un caso cerrado o cancelado")
 
@@ -148,7 +170,10 @@ async def accept_case(db: AsyncSession, case_id: uuid.UUID, engineer_id: uuid.UU
     return obj
 
 
-async def list_activities(db: AsyncSession, case_id: uuid.UUID) -> Sequence[CaseActivity]:
+async def list_activities(
+    db: AsyncSession, case_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Sequence[CaseActivity]:
+    await get_case(db, case_id, scope)  # valida pertenencia a la clínica
     stmt = (
         select(CaseActivity)
         .where(CaseActivity.case_id == case_id)
@@ -162,8 +187,9 @@ async def add_activity(
     case_id: uuid.UUID,
     payload: CaseActivityIn,
     author_id: uuid.UUID,
+    scope: uuid.UUID | None = None,
 ) -> CaseActivity:
-    case = await get_case(db, case_id)
+    case = await get_case(db, case_id, scope)
     if case.status in (CaseStatus.CLOSED, CaseStatus.CANCELLED):
         raise BadRequest("No se puede añadir actividad a un caso cerrado")
     activity = CaseActivity(

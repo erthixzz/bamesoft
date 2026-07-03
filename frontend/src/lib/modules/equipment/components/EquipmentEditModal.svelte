@@ -33,19 +33,32 @@
   };
   let saving = false;
 
-  $: form = {
-    name: equipment.name,
-    brand: equipment.brand ?? '',
-    model: equipment.model ?? '',
-    serial_number: equipment.serial_number ?? '',
-    manufacturer: equipment.manufacturer ?? '',
-    status: equipment.status,
-    risk_class: equipment.risk_class ?? '',
-    sector_id: equipment.sector_id ?? '',
-    notes: equipment.notes ?? '',
-    acquisition_date: equipment.acquisition_date ?? '',
-    warranty_until: equipment.warranty_until ?? '',
-  };
+  function hydrate() {
+    form = {
+      name: equipment.name,
+      brand: equipment.brand ?? '',
+      model: equipment.model ?? '',
+      serial_number: equipment.serial_number ?? '',
+      manufacturer: equipment.manufacturer ?? '',
+      status: equipment.status,
+      risk_class: equipment.risk_class ?? '',
+      sector_id: equipment.sector_id ?? '',
+      notes: equipment.notes ?? '',
+      acquisition_date: equipment.acquisition_date ?? '',
+      warranty_until: equipment.warranty_until ?? '',
+    };
+  }
+
+  // Hidratar SOLO al abrir (un `$: form = {...}` reactivo pisaría los cambios
+  // del usuario en cada re-render del padre).
+  let prevOpen = false;
+  $: if (open && !prevOpen) {
+    hydrate();
+    prevOpen = true;
+  }
+  $: if (!open && prevOpen) {
+    prevOpen = false;
+  }
 
   // Cargar las unidades de servicio de la clínica del equipo al abrir.
   $: if (open && equipment.clinic_id && sectors.length === 0) {

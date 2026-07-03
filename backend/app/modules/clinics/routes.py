@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import require_admin, require_authenticated
+from app.modules.auth.deps import clinic_scope, require_admin, require_authenticated
 from app.modules.clinics import service
 from app.modules.clinics.schemas import (
     ClinicCreate,
@@ -25,9 +25,9 @@ router = APIRouter(prefix="/clinics", tags=["clinics"])
 @router.get("", response_model=list[ClinicOut])
 async def list_clinics(
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return list(await service.list_clinics(db))
+    return list(await service.list_clinics(db, clinic_scope(current)))
 
 
 @router.post("", response_model=ClinicOut, status_code=status.HTTP_201_CREATED)
@@ -43,9 +43,9 @@ async def create_clinic(
 async def get_clinic(
     clinic_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.get_clinic(db, clinic_id)
+    return await service.get_clinic(db, clinic_id, clinic_scope(current))
 
 
 @router.patch("/{clinic_id}", response_model=ClinicOut)

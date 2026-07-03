@@ -4,6 +4,8 @@
   import { get } from 'svelte/store';
   import { isAuthenticated, profile, logout } from '$lib/stores/auth';
   import { authApi } from '$lib/modules/auth/api';
+  import { accessApi } from '$lib/modules/access/api';
+  import { setPermissions, setMyFeatures } from '$lib/utils/permissions';
   import Sidebar from '$lib/components/Sidebar.svelte';
   import Header from '$lib/components/Header.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
@@ -26,6 +28,15 @@
         // No redirigir: muestra el error para depurar (CORS, 401, etc.)
         bootError = e instanceof Error ? e.message : 'Error desconocido';
       }
+    }
+    // Cargar control de acceso (roles + módulos de la compañía). Si falla,
+    // se conservan los valores por defecto ya inicializados en el store.
+    try {
+      const [roles, mine] = await Promise.all([accessApi.getRoles(), accessApi.myFeatures()]);
+      setPermissions(roles.matrix);
+      setMyFeatures(mine.features);
+    } catch {
+      /* defaults */
     }
     booting = false;
   });

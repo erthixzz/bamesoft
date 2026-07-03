@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import EquipmentStatus
 from app.db.session import get_session
-from app.modules.auth.deps import require_authenticated, require_engineer
+from app.modules.auth.deps import clinic_scope, require_authenticated, require_engineer
 from app.modules.equipment import qr, service
 from app.modules.equipment.life_sheet_schemas import LifeSheetOut, LifeSheetUpdate
 from app.modules.equipment.schemas import (
@@ -32,12 +32,13 @@ async def list_equipment(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
+    scope = clinic_scope(current)
     return list(
         await service.list_equipment(
             db,
-            clinic_id=clinic_id,
+            clinic_id=scope if scope is not None else clinic_id,
             sector_id=sector_id,
             status=status_,
             q=q,
@@ -51,9 +52,9 @@ async def list_equipment(
 async def create_equipment(
     payload: EquipmentCreate,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_engineer),
+    current: User = Depends(require_engineer),
 ):
-    return await service.create_equipment(db, payload)
+    return await service.create_equipment(db, payload, clinic_scope(current))
 
 
 @router.get("/categories", response_model=list[EquipmentCategoryOut])
@@ -68,9 +69,9 @@ async def list_categories(
 async def get_by_code(
     code: str,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    obj = await service.get_by_code(db, code)
+    obj = await service.get_by_code(db, code, clinic_scope(current))
     if obj is None:
         from app.core.errors import NotFound
 
@@ -83,19 +84,25 @@ async def scan_qr(
     code: str = Query(...),
     token: str = Query(...),
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
     """Resolver un equipo a partir de los datos leídos del QR."""
-    return await service.get_by_qr(db, code, token)
+    obj = await service.get_by_qr(db, code, token)
+    scope = clinic_scope(current)
+    if scope is not None and obj.clinic_id != scope:
+        from app.core.errors import NotFound
+
+        raise NotFound("Equipo (QR no coincide)")
+    return obj
 
 
 @router.get("/{equipment_id}", response_model=EquipmentOut)
 async def get_equipment(
     equipment_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.get_equipment(db, equipment_id)
+    return await service.get_equipment(db, equipment_id, clinic_scope(current))
 
 
 @router.patch("/{equipment_id}", response_model=EquipmentOut)
@@ -103,28 +110,28 @@ async def update_equipment(
     equipment_id: uuid.UUID,
     payload: EquipmentUpdate,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_engineer),
+    current: User = Depends(require_engineer),
 ):
-    return await service.update_equipment(db, equipment_id, payload)
+    return await service.update_equipment(db, equipment_id, payload, clinic_scope(current))
 
 
 @router.post("/{equipment_id}/regenerate-qr", response_model=EquipmentOut)
 async def regenerate_qr_token(
     equipment_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_engineer),
+    current: User = Depends(require_engineer),
 ):
-    return await service.regenerate_qr(db, equipment_id)
+    return await service.regenerate_qr(db, equipment_id, clinic_scope(current))
 
 
 @router.get("/{equipment_id}/life-sheet", response_model=LifeSheetOut)
 async def get_life_sheet(
     equipment_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
     """Hoja de vida del equipo (consulta). Si no existe, devuelve vacía."""
-    return await service.get_life_sheet(db, equipment_id)
+    return await service.get_life_sheet(db, equipment_id, clinic_scope(current))
 
 
 @router.put("/{equipment_id}/life-sheet", response_model=LifeSheetOut)
@@ -132,10 +139,10 @@ async def save_life_sheet(
     equipment_id: uuid.UUID,
     payload: LifeSheetUpdate,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_engineer),
+    current: User = Depends(require_engineer),
 ):
     """Crea/actualiza la hoja de vida y sincroniza los campos del equipo."""
-    return await service.upsert_life_sheet(db, equipment_id, payload)
+    return await service.upsert_life_sheet(db, equipment_id, payload, clinic_scope(current))
 
 
 @router.get(
@@ -146,8 +153,8 @@ async def save_life_sheet(
 async def qr_png(
     equipment_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    obj = await service.get_equipment(db, equipment_id)
+    obj = await service.get_equipment(db, equipment_id, clinic_scope(current))
     url = qr.build_url(obj.code, obj.qr_token)
     return Response(content=qr.render_png(url), media_type="image/png")

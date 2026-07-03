@@ -1,22 +1,27 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { get } from 'svelte/store';
   import Table from '$lib/components/Table.svelte';
   import Card from '$lib/components/Card.svelte';
   import Badge from '$lib/components/Badge.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Button from '$lib/components/Button.svelte';
   import PageHeader from '$lib/components/PageHeader.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
   import UserEditModal from '$lib/modules/users/components/UserEditModal.svelte';
+  import UserCreateModal from '$lib/modules/users/components/UserCreateModal.svelte';
   import { usersApi } from '$lib/modules/users/api';
   import { clinicsApi } from '$lib/modules/clinics/api';
   import type { User } from '$lib/modules/users/types';
   import type { Clinic } from '$lib/modules/clinics/types';
   import type { CtxItem } from '$lib/stores/contextMenu';
-  import { ROLE_LABELS, ROLE_CAPABILITIES, ALL_ROLES } from '$lib/utils/permissions';
+  import { ROLE_LABELS, CAPABILITIES, ALL_ROLES, permissions, hasCapIn } from '$lib/utils/permissions';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
   import type { UserRole } from '$lib/api/types';
-  import { Users, Copy, UserX, Pencil, Check, ShieldCheck } from 'lucide-svelte';
+  import { Users, Copy, UserX, Pencil, Check, ShieldCheck, PlusCircle, Search } from 'lucide-svelte';
 
   function roleLabel(r: string): string {
     return ROLE_LABELS[r as UserRole] ?? r;
@@ -27,8 +32,18 @@
   let loading = true;
   let editOpen = false;
   let editing: User | null = null;
+  let createOpen = false;
+  let q = '';
 
   $: clinicName = Object.fromEntries(clinics.map((c) => [c.id, c.name]));
+
+  // Filtro local: nombre, email, compañía o rol.
+  $: filtered = q.trim()
+    ? rows.filter((u) => {
+        const hay = `${u.full_name} ${u.email} ${u.clinic_id ? (clinicName[u.clinic_id] ?? '') : ''} ${roleLabel(u.role)}`.toLowerCase();
+        return hay.includes(q.trim().toLowerCase());
+      })
+    : rows;
 
   const columns = [
     { key: 'full_name', label: 'Nombre' },
@@ -50,6 +65,8 @@
 
   onMount(() => {
     setPageTitle('Usuarios');
+    // Prefill desde el buscador global (/users?q=email).
+    q = get(page).url.searchParams.get('q') ?? '';
     load();
   });
 
@@ -94,15 +111,29 @@
   ];
 </script>
 
-<PageHeader title="Usuarios" subtitle="Gestiona roles, compañías y permisos" icon={Users} gradient="brand" />
+<PageHeader title="Usuarios" subtitle="Gestiona roles, compañías y permisos" icon={Users} gradient="brand">
+  <svelte:fragment slot="actions">
+    <Button on:click={() => (createOpen = true)}><PlusCircle class="h-4 w-4" /> Nuevo usuario</Button>
+  </svelte:fragment>
+</PageHeader>
 
 <Card>
+  <div class="mb-4 max-w-md">
+    <Input placeholder="Buscar por nombre, email, compañía o rol…" bind:value={q} />
+  </div>
+
   {#if loading}
     <Spinner label="Cargando usuarios…" />
   {:else if rows.length === 0}
-    <EmptyState icon={Users} title="Sin usuarios registrados" />
+    <EmptyState icon={Users} title="Sin usuarios registrados" description="Crea el primero con el botón «Nuevo usuario».">
+      <svelte:fragment slot="actions">
+        <Button on:click={() => (createOpen = true)}>+ Nuevo usuario</Button>
+      </svelte:fragment>
+    </EmptyState>
+  {:else if filtered.length === 0}
+    <EmptyState icon={Search} title="Sin resultados" description={`Ningún usuario coincide con «${q.trim()}».`} />
   {:else}
-    <Table {columns} {rows} {rowMenu}>
+    <Table {columns} rows={filtered} {rowMenu}>
       <svelte:fragment slot="cell" let:row let:column>
         {#if column === 'full_name'}
           <button type="button" class="inline-flex items-center gap-1.5 font-medium text-brand-700 hover:underline" on:click={() => edit(row)}>
@@ -125,7 +156,7 @@
 
 <!-- Matriz de permisos por rol -->
 <div class="mt-4">
-  <Card title="Permisos por rol" description="Qué puede hacer cada rol en la plataforma." icon={ShieldCheck} accent="violet">
+  <Card title="Permisos por rol" description="Vista de solo lectura; se edita en la sección Roles." icon={ShieldCheck} accent="violet">
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead class="text-left text-xs uppercase text-slate-500">
@@ -137,12 +168,12 @@
           </tr>
         </thead>
         <tbody class="divide-y divide-slate-100">
-          {#each ROLE_CAPABILITIES as cap}
+          {#each CAPABILITIES as cap}
             <tr>
               <td class="py-2.5 pr-3 text-slate-700">{cap.label}</td>
               {#each ALL_ROLES as r}
                 <td class="px-2 text-center">
-                  {#if cap.roles.includes(r)}
+                  {#if hasCapIn($permissions, r, cap.key)}
                     <Check class="mx-auto h-4 w-4 text-emerald-600" />
                   {:else}
                     <span class="text-slate-300">—</span>
@@ -164,3 +195,5 @@
 {#if editing}
   <UserEditModal bind:open={editOpen} user={editing} on:saved={onSaved} />
 {/if}
+
+<UserCreateModal bind:open={createOpen} on:created={onSaved} />

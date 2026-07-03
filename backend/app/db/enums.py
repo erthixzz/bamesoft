@@ -5,7 +5,8 @@ from enum import StrEnum
 
 
 class UserRole(StrEnum):
-    ADMIN = "admin"
+    ADMIN = "admin"  # Super admin global (ve/gestiona todas las clínicas)
+    CLINIC_ADMIN = "clinic_admin"  # Admin de una clínica (scoped a su clínica)
     ENGINEER = "engineer"
     CLIENT = "client"
     SERVICE = "service"

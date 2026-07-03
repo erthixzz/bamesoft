@@ -64,16 +64,35 @@ def require_role(*roles: UserRole):
     return _dep
 
 
-require_admin = require_role(UserRole.ADMIN)
-require_engineer = require_role(UserRole.ADMIN, UserRole.ENGINEER)
+require_admin = require_role(UserRole.ADMIN)  # super admin (global)
+require_clinic_admin = require_role(UserRole.ADMIN, UserRole.CLINIC_ADMIN)
+require_engineer = require_role(UserRole.ADMIN, UserRole.CLINIC_ADMIN, UserRole.ENGINEER)
 require_staff = require_role(
-    UserRole.ADMIN, UserRole.ENGINEER, UserRole.SERVICE, UserRole.SUPPORT
+    UserRole.ADMIN,
+    UserRole.CLINIC_ADMIN,
+    UserRole.ENGINEER,
+    UserRole.SERVICE,
+    UserRole.SUPPORT,
 )
 
 
+def clinic_scope(user: User) -> uuid.UUID | None:
+    """Clínica a la que se limita el usuario.
+
+    `None` = super admin (ve todas). Cualquier otro rol queda restringido a su
+    propia clínica (`user.clinic_id`); si no tiene clínica asignada, se usa un
+    UUID imposible para que no vea nada de otras clínicas.
+    """
+    if user.role == UserRole.ADMIN:
+        return None
+    return user.clinic_id or uuid.UUID(int=0)
+
+
 __all__ = [
+    "clinic_scope",
     "require_admin",
     "require_authenticated",
+    "require_clinic_admin",
     "require_engineer",
     "require_role",
     "require_staff",

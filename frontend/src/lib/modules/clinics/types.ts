@@ -9,6 +9,17 @@ export interface Clinic {
   created_at: string;
 }
 
+export interface ClinicCreate {
+  name: string;
+  tax_id?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  address?: string | null;
+  logo_url?: string | null;
+}
+
+export type ClinicUpdate = Partial<Omit<ClinicCreate, 'tax_id'>>;
+
 export interface Location {
   id: string;
   clinic_id: string;

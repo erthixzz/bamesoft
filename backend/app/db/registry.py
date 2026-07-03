@@ -6,6 +6,7 @@ importar desde otros módulos del backend para evitar ciclos.
 from __future__ import annotations
 
 from app.db.base import Base  # noqa: F401
+from app.modules.access.models import ClinicFeature, RolePermission  # noqa: F401
 from app.modules.alerts.models import Alert  # noqa: F401
 from app.modules.calibrations.models import Calibration  # noqa: F401
 from app.modules.cases.models import Case, CaseActivity  # noqa: F401

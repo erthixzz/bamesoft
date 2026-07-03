@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import require_authenticated
+from app.modules.auth.deps import clinic_scope, require_authenticated
 from app.modules.reports import service
 from app.modules.reports.schemas import (
     ComplianceReport,
@@ -22,17 +22,17 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 @router.get("/dashboard", response_model=DashboardKPIs)
 async def dashboard(
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.dashboard(db)
+    return await service.dashboard(db, clinic_scope(current))
 
 
 @router.get("/compliance", response_model=ComplianceReport)
 async def compliance(
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.compliance(db)
+    return await service.compliance(db, clinic_scope(current))
 
 
 @router.get("/productivity", response_model=ProductivityReport)
@@ -40,9 +40,9 @@ async def productivity(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.productivity(db, date_from, date_to)
+    return await service.productivity(db, date_from, date_to, clinic_scope(current))
 
 
 @router.get("/operations", response_model=OperationsReport)
@@ -50,6 +50,6 @@ async def operations(
     date_from: date | None = Query(default=None),
     date_to: date | None = Query(default=None),
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.operations(db, date_from, date_to)
+    return await service.operations(db, date_from, date_to, clinic_scope(current))

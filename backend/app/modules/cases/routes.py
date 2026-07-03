@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import CaseStatus
 from app.db.session import get_session
-from app.modules.auth.deps import require_authenticated, require_engineer
+from app.modules.auth.deps import clinic_scope, require_authenticated, require_engineer
 from app.modules.cases import service
 from app.modules.cases.schemas import (
     CaseActivityIn,
@@ -30,7 +30,7 @@ async def list_cases(
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
     return list(
         await service.list_cases(
@@ -38,6 +38,7 @@ async def list_cases(
             status=status_,
             assigned_to=assigned_to,
             equipment_id=equipment_id,
+            scope=clinic_scope(current),
             limit=limit,
             offset=offset,
         )
@@ -50,16 +51,16 @@ async def create_case(
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_authenticated),
 ):
-    return await service.create_case(db, payload, current.id)
+    return await service.create_case(db, payload, current.id, clinic_scope(current))
 
 
 @router.get("/{case_id}", response_model=CaseOut)
 async def get_case(
     case_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return await service.get_case(db, case_id)
+    return await service.get_case(db, case_id, clinic_scope(current))
 
 
 @router.patch("/{case_id}", response_model=CaseOut)
@@ -69,7 +70,7 @@ async def update_case(
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_engineer),
 ):
-    return await service.update_case(db, case_id, payload, current.id)
+    return await service.update_case(db, case_id, payload, current.id, clinic_scope(current))
 
 
 @router.post("/{case_id}/accept", response_model=CaseOut)
@@ -78,16 +79,16 @@ async def accept_case(
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_engineer),
 ):
-    return await service.accept_case(db, case_id, current.id)
+    return await service.accept_case(db, case_id, current.id, clinic_scope(current))
 
 
 @router.get("/{case_id}/activities", response_model=list[CaseActivityOut])
 async def list_activities(
     case_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
-    return list(await service.list_activities(db, case_id))
+    return list(await service.list_activities(db, case_id, clinic_scope(current)))
 
 
 @router.post(
@@ -101,4 +102,4 @@ async def add_activity(
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_authenticated),
 ):
-    return await service.add_activity(db, case_id, payload, current.id)
+    return await service.add_activity(db, case_id, payload, current.id, clinic_scope(current))

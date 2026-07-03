@@ -11,6 +11,7 @@
   import type { UserRole } from '$lib/api/types';
   import { ROLE_LABELS, ALL_ROLES } from '$lib/utils/permissions';
   import { toasts } from '$lib/stores/toasts';
+  import { role } from '$lib/stores/auth';
 
   export let open = false;
   export let user: User;
@@ -29,14 +30,28 @@
     active: 'true',
   };
 
-  $: form = {
-    full_name: user.full_name,
-    role: user.role,
-    phone: user.phone ?? '',
-    license_number: user.license_number ?? '',
-    clinic_id: user.clinic_id ?? '',
-    active: user.active ? 'true' : 'false',
-  };
+  function hydrate() {
+    form = {
+      full_name: user.full_name,
+      role: user.role,
+      phone: user.phone ?? '',
+      license_number: user.license_number ?? '',
+      clinic_id: user.clinic_id ?? '',
+      active: user.active ? 'true' : 'false',
+    };
+  }
+
+  // Hidratar SOLO al abrir el modal. Un `$: form = {...user}` reactivo se
+  // re-ejecuta con cada re-render del padre (las props objeto siempre se
+  // consideran "cambiadas") y pisa lo que el usuario está editando.
+  let prevOpen = false;
+  $: if (open && !prevOpen) {
+    hydrate();
+    prevOpen = true;
+  }
+  $: if (!open && prevOpen) {
+    prevOpen = false;
+  }
 
   $: if (open && clinics.length === 0) {
     clinicsApi
@@ -45,7 +60,12 @@
       .catch(() => (clinics = []));
   }
 
-  const roleOptions = ALL_ROLES.map((r) => ({ value: r, label: ROLE_LABELS[r] }));
+  // Solo el super admin puede asignar el rol de super admin.
+  $: isSuper = $role === 'admin';
+  $: roleOptions = ALL_ROLES.filter((r) => isSuper || r !== 'admin').map((r) => ({
+    value: r,
+    label: ROLE_LABELS[r],
+  }));
 
   async function save() {
     saving = true;
@@ -74,12 +94,14 @@
   <div class="grid gap-4 sm:grid-cols-2">
     <div class="sm:col-span-2"><Input label="Nombre completo" bind:value={form.full_name} /></div>
     <Select label="Rol" bind:value={form.role} options={roleOptions} />
-    <Select
-      label="Compañía / clínica"
-      bind:value={form.clinic_id}
-      options={clinics.map((c) => ({ value: c.id, label: c.name }))}
-      placeholder="— Sin compañía —"
-    />
+    {#if isSuper}
+      <Select
+        label="Compañía / clínica"
+        bind:value={form.clinic_id}
+        options={clinics.map((c) => ({ value: c.id, label: c.name }))}
+        placeholder="— Sin compañía —"
+      />
+    {/if}
     <Input label="Teléfono" bind:value={form.phone} />
     <Input label="Licencia / matrícula" bind:value={form.license_number} />
     <Select

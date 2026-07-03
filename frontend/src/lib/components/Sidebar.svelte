@@ -6,8 +6,13 @@
   import { tooltip } from '$lib/actions/tooltip';
   import CaseLegendModal from '$lib/modules/cases/components/CaseLegendModal.svelte';
   import { role } from '$lib/stores/auth';
-  import { isOneOf } from '$lib/utils/permissions';
-  import type { UserRole } from '$lib/api/types';
+  import {
+    permissions,
+    myFeatures,
+    hasCapIn,
+    featureOn,
+    type Capability,
+  } from '$lib/utils/permissions';
   import {
     LayoutDashboard,
     Wrench,
@@ -20,27 +25,37 @@
     Settings,
     HelpCircle,
     Building2,
+    ShieldCheck,
+    KeyRound,
     X,
   } from 'lucide-svelte';
 
   let legendOpen = false;
 
-  // `roles` ausente = visible para todos. El operario (service) y el cliente
-  // ven solo lo necesario para reportar y consultar.
-  const items: { href: string; label: string; icon: typeof Wrench; roles?: UserRole[] }[] = [
-    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['admin', 'engineer', 'support'] },
-    { href: '/equipment', label: 'Equipos', icon: QrCode },
-    { href: '/sectors', label: 'Unidades de servicio', icon: Building2, roles: ['admin', 'engineer'] },
-    { href: '/cases', label: 'Casos', icon: Wrench },
-    { href: '/alerts', label: 'Alertas', icon: AlertTriangle },
-    { href: '/documents', label: 'Documentos', icon: FileText },
-    { href: '/standards', label: 'Normas', icon: BookOpen, roles: ['admin', 'engineer'] },
-    { href: '/reports', label: 'Reportes', icon: BarChart3, roles: ['admin', 'engineer', 'support'] },
-    { href: '/users', label: 'Usuarios', icon: Users, roles: ['admin'] },
+  // `cap` = capacidad de rol requerida; `feature` = módulo que la compañía debe
+  // tener habilitado. Ausentes = visible para todos.
+  type NavItem = { href: string; label: string; icon: typeof Wrench; cap?: Capability; feature?: string };
+  const items: NavItem[] = [
+    { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, cap: 'dashboard', feature: 'dashboard' },
+    { href: '/equipment', label: 'Equipos', icon: QrCode, feature: 'equipment' },
+    { href: '/sectors', label: 'Unidades de servicio', icon: Building2, cap: 'sectors', feature: 'sectors' },
+    { href: '/cases', label: 'Casos', icon: Wrench, feature: 'cases' },
+    { href: '/alerts', label: 'Alertas', icon: AlertTriangle, feature: 'alerts' },
+    { href: '/documents', label: 'Documentos', icon: FileText, feature: 'documents' },
+    { href: '/standards', label: 'Normas', icon: BookOpen, cap: 'standards', feature: 'standards' },
+    { href: '/reports', label: 'Reportes', icon: BarChart3, cap: 'reports', feature: 'reports' },
+    { href: '/clinics', label: 'Compañías', icon: Building2, cap: 'clinics' },
+    { href: '/users', label: 'Usuarios', icon: Users, cap: 'users' },
+    { href: '/roles', label: 'Roles', icon: ShieldCheck, cap: 'access' },
+    { href: '/permissions', label: 'Permisos', icon: KeyRound, cap: 'access' },
     { href: '/settings', label: 'Ajustes', icon: Settings },
   ];
 
-  $: visibleItems = items.filter((i) => !i.roles || isOneOf($role, i.roles));
+  $: visibleItems = items.filter(
+    (i) =>
+      (!i.cap || hasCapIn($permissions, $role, i.cap)) &&
+      (!i.feature || featureOn($myFeatures, i.feature)),
+  );
   $: current = $page.url.pathname;
 
   // Cerrar el drawer al navegar (móvil)

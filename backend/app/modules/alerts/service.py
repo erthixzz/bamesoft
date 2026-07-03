@@ -13,16 +13,32 @@ from app.db.enums import AlertSeverity, AlertType
 from app.modules.alerts.models import Alert
 from app.modules.alerts.schemas import AlertCreate
 from app.modules.calibrations.models import Calibration
+from app.modules.equipment.models import Equipment
 from app.modules.maintenance.models import MaintenanceSchedule
 
 
 async def list_alerts(
-    db: AsyncSession, *, only_active: bool = True, limit: int = 100
+    db: AsyncSession, *, only_active: bool = True, scope: uuid.UUID | None = None, limit: int = 100
 ) -> Sequence[Alert]:
     stmt = select(Alert).order_by(Alert.created_at.desc())
+    if scope is not None:
+        stmt = stmt.join(Equipment, Equipment.id == Alert.equipment_id).where(
+            Equipment.clinic_id == scope
+        )
     if only_active:
         stmt = stmt.where(Alert.resolved_at.is_(None))
     return (await db.execute(stmt.limit(limit))).scalars().all()
+
+
+async def _get_scoped(db: AsyncSession, alert_id: uuid.UUID, scope: uuid.UUID | None) -> Alert:
+    obj = await db.get(Alert, alert_id)
+    if obj is None:
+        raise NotFound("Alerta")
+    if scope is not None:
+        eq = await db.get(Equipment, obj.equipment_id) if obj.equipment_id else None
+        if eq is None or eq.clinic_id != scope:
+            raise NotFound("Alerta")
+    return obj
 
 
 async def create(db: AsyncSession, payload: AlertCreate) -> Alert:
@@ -33,20 +49,16 @@ async def create(db: AsyncSession, payload: AlertCreate) -> Alert:
     return obj
 
 
-async def acknowledge(db: AsyncSession, alert_id: uuid.UUID) -> Alert:
-    obj = await db.get(Alert, alert_id)
-    if obj is None:
-        raise NotFound("Alerta")
+async def acknowledge(db: AsyncSession, alert_id: uuid.UUID, scope: uuid.UUID | None = None) -> Alert:
+    obj = await _get_scoped(db, alert_id, scope)
     obj.acknowledged_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(obj)
     return obj
 
 
-async def resolve(db: AsyncSession, alert_id: uuid.UUID) -> Alert:
-    obj = await db.get(Alert, alert_id)
-    if obj is None:
-        raise NotFound("Alerta")
+async def resolve(db: AsyncSession, alert_id: uuid.UUID, scope: uuid.UUID | None = None) -> Alert:
+    obj = await _get_scoped(db, alert_id, scope)
     obj.resolved_at = datetime.now(UTC)
     await db.flush()
     await db.refresh(obj)

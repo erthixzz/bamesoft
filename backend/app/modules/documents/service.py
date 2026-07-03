@@ -62,8 +62,13 @@ async def list_for_case(db: AsyncSession, case_id: uuid.UUID) -> Sequence[Docume
     return (await db.execute(stmt)).scalars().all()
 
 
-async def signed_url(db: AsyncSession, doc_id: uuid.UUID, expires_in: int = 3600) -> str:
+async def get_document(db: AsyncSession, doc_id: uuid.UUID) -> Document:
     doc = await db.get(Document, doc_id)
     if doc is None:
         raise NotFound("Documento")
+    return doc
+
+
+async def signed_url(db: AsyncSession, doc_id: uuid.UUID, expires_in: int = 3600) -> str:
+    doc = await get_document(db, doc_id)
     return sb.signed_url(doc.storage_path, expires_in=expires_in)

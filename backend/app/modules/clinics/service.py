@@ -18,13 +18,18 @@ from app.modules.clinics.schemas import (
 
 
 # Clinics ----------------------------------------------------------------
-async def list_clinics(db: AsyncSession) -> Sequence[Clinic]:
-    return (await db.execute(select(Clinic).order_by(Clinic.name))).scalars().all()
+async def list_clinics(db: AsyncSession, scope: uuid.UUID | None = None) -> Sequence[Clinic]:
+    stmt = select(Clinic).order_by(Clinic.name)
+    if scope is not None:
+        stmt = stmt.where(Clinic.id == scope)  # el admin de clínica solo ve la suya
+    return (await db.execute(stmt)).scalars().all()
 
 
-async def get_clinic(db: AsyncSession, clinic_id: uuid.UUID) -> Clinic:
+async def get_clinic(
+    db: AsyncSession, clinic_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Clinic:
     obj = await db.get(Clinic, clinic_id)
-    if obj is None:
+    if obj is None or (scope is not None and obj.id != scope):
         raise NotFound("Clínica")
     return obj
 

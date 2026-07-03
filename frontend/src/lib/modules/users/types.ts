@@ -25,3 +25,14 @@ export interface UserCreate {
 }
 
 export type UserUpdate = Partial<Omit<UserCreate, 'id' | 'email'>> & { active?: boolean };
+
+/** Alta completa desde la UI (crea cuenta de acceso + perfil). */
+export interface UserInvite {
+  email: string;
+  password: string;
+  full_name: string;
+  role: UserRole;
+  phone?: string | null;
+  license_number?: string | null;
+  clinic_id?: string | null;
+}

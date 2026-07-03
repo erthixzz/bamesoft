@@ -24,6 +24,12 @@ class UserCreate(UserBase):
     id: uuid.UUID  # debe coincidir con auth.users.id
 
 
+class UserInvite(UserBase):
+    """Alta completa desde la UI: crea la cuenta en Supabase Auth + el perfil."""
+
+    password: str = Field(min_length=8, max_length=128)
+
+
 class UserUpdate(BaseModel):
     full_name: str | None = None
     role: UserRole | None = None

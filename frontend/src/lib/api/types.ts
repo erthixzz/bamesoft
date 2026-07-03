@@ -3,7 +3,13 @@
  * `backend/app/db/enums.py` y los `schemas.py` de cada módulo).
  */
 
-export type UserRole = 'admin' | 'engineer' | 'client' | 'service' | 'support';
+export type UserRole =
+  | 'admin'
+  | 'clinic_admin'
+  | 'engineer'
+  | 'client'
+  | 'service'
+  | 'support';
 
 export type EquipmentStatus =
   | 'operational'
