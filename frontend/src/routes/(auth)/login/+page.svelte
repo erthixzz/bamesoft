@@ -1,5 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import Button from '$lib/components/Button.svelte';
@@ -13,6 +14,12 @@
   let loading = false;
   let error: string | null = null;
 
+  /** Solo se permite redirigir a rutas internas (evita open-redirect). */
+  function safeNext(): string {
+    const next = $page.url.searchParams.get('next') ?? '';
+    return next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+  }
+
   async function onSubmit(e: SubmitEvent) {
     e.preventDefault();
     loading = true;
@@ -20,7 +27,7 @@
     try {
       await login(email, password);
       toasts.success('¡Bienvenido!');
-      goto('/dashboard');
+      goto(safeNext());
     } catch (e) {
       error = e instanceof Error ? e.message : 'Error al iniciar sesión';
     } finally {
