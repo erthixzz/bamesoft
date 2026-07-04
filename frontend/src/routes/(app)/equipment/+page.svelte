@@ -84,8 +84,8 @@
   }
 
   const rowMenu = (row: Equipment): CtxItem[] => [
-    { label: 'Ver detalle', icon: Eye, href: `/equipment/${row.id}` },
-    { label: 'Editar', icon: Pencil, href: `/equipment/${row.id}?edit=1` },
+    { label: 'Ver detalle', icon: Eye, href: `/equipment/${row.code}` },
+    { label: 'Editar', icon: Pencil, href: `/equipment/${row.code}?edit=1` },
     { divider: true },
     { label: 'Copiar código', icon: Copy, onClick: () => copy(row.code, 'Código copiado') },
     { label: 'Regenerar QR', icon: RefreshCw, onClick: () => regenerateQr(row) },
@@ -157,7 +157,7 @@
             {:else if column === 'created_at'}
               {formatDate(row.created_at)}
             {:else if column === 'code'}
-              <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${row.id}`}>{row.code}</a>
+              <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${row.code}`}>{row.code}</a>
             {:else}
               {row[column] ?? '—'}
             {/if}
@@ -177,7 +177,7 @@
         {:else if column === 'created_at'}
           {formatDate(row.created_at)}
         {:else if column === 'code'}
-          <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${row.id}`}>
+          <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${row.code}`}>
             {row.code}
           </a>
         {:else}

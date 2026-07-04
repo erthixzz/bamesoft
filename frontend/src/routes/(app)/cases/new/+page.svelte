@@ -108,7 +108,7 @@
       };
       const c = await casesApi.create(payload);
       toasts.success(`Caso ${c.code} creado`);
-      goto(`/cases/${c.id}`);
+      goto(`/cases/${c.code}`);
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : 'Error al crear');
     } finally {

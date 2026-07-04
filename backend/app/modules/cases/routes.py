@@ -54,6 +54,15 @@ async def create_case(
     return await service.create_case(db, payload, current.id, clinic_scope(current))
 
 
+@router.get("/by-code/{code}", response_model=CaseOut)
+async def get_case_by_code(
+    code: str,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_authenticated),
+):
+    return await service.get_case_by_code(db, code, clinic_scope(current))
+
+
 @router.get("/{case_id}", response_model=CaseOut)
 async def get_case(
     case_id: uuid.UUID,

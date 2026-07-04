@@ -145,7 +145,7 @@
             {#each items as e (e.id)}
               <li>
                 <a
-                  href={`/equipment/${e.id}`}
+                  href={`/equipment/${e.code}`}
                   class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 transition hover:border-brand-200 hover:bg-brand-50/40"
                 >
                   <span class="min-w-0">
@@ -178,7 +178,7 @@
         <ul class="grid gap-1.5 sm:grid-cols-2">
           {#each orphans as e (e.id)}
             <li>
-              <a href={`/equipment/${e.id}`} class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 transition hover:bg-slate-50">
+              <a href={`/equipment/${e.code}`} class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 px-3 py-2 transition hover:bg-slate-50">
                 <span class="min-w-0">
                   <span class="font-mono text-[11px] text-slate-400">{e.code}</span>
                   <span class="block truncate text-sm font-medium text-slate-800">{e.name}</span>

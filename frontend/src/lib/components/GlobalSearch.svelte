@@ -41,9 +41,9 @@
   function hrefFor(r: SearchResult): string {
     switch (r.type) {
       case 'equipment':
-        return `/equipment/${r.id}`;
+        return `/equipment/${r.slug ?? r.id}`;
       case 'case':
-        return `/cases/${r.id}`;
+        return `/cases/${r.slug ?? r.id}`;
       case 'user':
         return `/users?q=${encodeURIComponent(r.subtitle ?? r.title)}`;
       case 'sector':

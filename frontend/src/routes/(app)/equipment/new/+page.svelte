@@ -86,7 +86,7 @@
       };
       const eq = await equipmentApi.create(payload);
       toasts.success(`Equipo ${eq.code} creado`);
-      goto(`/equipment/${eq.id}`);
+      goto(`/equipment/${eq.code}`);
     } catch (err) {
       toasts.error(err instanceof Error ? err.message : 'Error al crear');
     } finally {

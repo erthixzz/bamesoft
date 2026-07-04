@@ -40,6 +40,7 @@
   import type { MaintenanceSchedule } from '$lib/modules/maintenance/types';
   import type { Doc } from '$lib/modules/documents/types';
   import { formatDate } from '$lib/utils/format';
+  import { isUuid } from '$lib/utils/slug';
   import { setPageTitle } from '$lib/stores/page';
 
   let id = '';
@@ -59,14 +60,16 @@
 
   onMount(async () => {
     try {
-      eq = await equipmentApi.get(id);
+      // La URL puede traer el código legible (ANE-UCI-01) o un UUID.
+      eq = isUuid(id) ? await equipmentApi.get(id) : await equipmentApi.byCode(id);
+      const eqId = eq.id;
       // Abre el modal de edición si se llegó con ?edit=1 (desde el menú contextual).
       if ($page.url.searchParams.get('edit') === '1') editOpen = true;
       [cases, cals, pms, docs] = await Promise.all([
-        casesApi.list({ equipment_id: id }),
-        calibrationsApi.forEquipment(id),
-        maintenanceApi.forEquipment(id),
-        documentsApi.forEquipment(id),
+        casesApi.list({ equipment_id: eqId }),
+        calibrationsApi.forEquipment(eqId),
+        maintenanceApi.forEquipment(eqId),
+        documentsApi.forEquipment(eqId),
       ]);
       if (eq.sector_id) {
         sectorLabel = (await sectorsApi.get(eq.sector_id).catch(() => null))?.name ?? '—';
@@ -148,7 +151,7 @@
 
       <div class="mt-3 flex flex-wrap gap-2">
         <Button on:click={() => (editOpen = true)}><Pencil class="h-4 w-4" /> Editar</Button>
-        <a class="btn-secondary" href={`/equipment/${eq.id}/hoja-de-vida`}><FileText class="h-4 w-4" /> Hoja de vida</a>
+        <a class="btn-secondary" href={`/equipment/${eq.code}/hoja-de-vida`}><FileText class="h-4 w-4" /> Hoja de vida</a>
         <a class="btn-secondary" href={`/cases/new?equipment_id=${eq.id}`}><Wrench class="h-4 w-4" /> Caso para este equipo</a>
       </div>
     </div>
@@ -216,7 +219,7 @@
       <ul class="space-y-2">
         {#each cases as c}
           <li class="flex items-center justify-between border-b border-slate-100 py-2 last:border-0">
-            <a class="text-sm font-medium text-brand-700 hover:underline" href={`/cases/${c.id}`}>
+            <a class="text-sm font-medium text-brand-700 hover:underline" href={`/cases/${c.code}`}>
               {c.code} · {c.title}
             </a>
             <CaseStatusBadge status={c.status} />

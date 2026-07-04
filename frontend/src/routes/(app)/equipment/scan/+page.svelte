@@ -17,7 +17,7 @@
       const { code, token } = parseQrPayload(e.detail.raw);
       const eq = await equipmentApi.scan(code, token);
       toasts.success(`Equipo ${eq.code} reconocido`);
-      goto(`/equipment/${eq.id}`);
+      goto(`/equipment/${eq.code}`);
     } catch (err) {
       lastError = err instanceof Error ? err.message : 'No se pudo identificar el QR';
     }

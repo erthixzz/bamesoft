@@ -25,8 +25,10 @@
   } from '$lib/modules/equipment/lifeSheet';
   import { toasts } from '$lib/stores/toasts';
   import { setPageTitle } from '$lib/stores/page';
+  import { isUuid } from '$lib/utils/slug';
 
   let id = '';
+  let eqId = ''; // UUID real del equipo (la URL puede traer el código)
   let sheet: LifeSheet | null = null;
   let loading = true;
   let error: string | null = null;
@@ -107,7 +109,9 @@
 
   onMount(async () => {
     try {
-      sheet = hydrate(await equipmentApi.getLifeSheet(id));
+      // La URL puede traer el código legible o un UUID; resolvemos el UUID.
+      eqId = isUuid(id) ? id : (await equipmentApi.byCode(id)).id;
+      sheet = hydrate(await equipmentApi.getLifeSheet(eqId));
     } catch (e) {
       error = e instanceof Error ? e.message : 'No se pudo cargar la hoja de vida.';
     } finally {
@@ -147,7 +151,7 @@
     if (!payload) return;
     saving = true;
     try {
-      sheet = hydrate(await equipmentApi.saveLifeSheet(id, payload));
+      sheet = hydrate(await equipmentApi.saveLifeSheet(eqId, payload));
       toasts.success('Hoja de vida guardada');
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'No se pudo guardar');
@@ -301,7 +305,7 @@
 
 <PageHeader title="Hoja de vida" subtitle={sheet ? `${sheet.code}` : ''} icon={FileText}>
   <svelte:fragment slot="actions">
-    <a class="btn-secondary" href={`/equipment/${id}`}>
+    <a class="btn-secondary" href={`/equipment/${sheet?.code ?? id}`}>
       <ArrowLeft class="h-4 w-4" /> Volver al equipo
     </a>
     <Button variant="secondary" on:click={exportPdf} loading={exporting} disabled={!sheet}>

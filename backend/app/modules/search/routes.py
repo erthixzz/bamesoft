@@ -32,7 +32,7 @@ _PER_TYPE = 5
 _SEARCH_SQL = text(
     """
     (
-      select 'equipment' as rtype, cast(e.id as text) as rid,
+      select 'equipment' as rtype, cast(e.id as text) as rid, e.code as slug,
              e.code || ' · ' || e.name as title,
              nullif(concat_ws(' · ', e.brand, e.model, e.serial_number), '') as subtitle
       from equipment e
@@ -45,7 +45,7 @@ _SEARCH_SQL = text(
     )
     union all
     (
-      select 'case', cast(c.id as text), c.code || ' · ' || c.title, e.name
+      select 'case', cast(c.id as text), c.code, c.code || ' · ' || c.title, e.name
       from cases c
       join equipment e on e.id = c.equipment_id
       where (cast(:scope as uuid) is null or e.clinic_id = cast(:scope as uuid))
@@ -55,7 +55,7 @@ _SEARCH_SQL = text(
     )
     union all
     (
-      select 'sector', cast(s.id as text), s.name, s.description
+      select 'sector', cast(s.id as text), null, s.name, s.description
       from sectors s
       where (cast(:scope as uuid) is null or s.clinic_id = cast(:scope as uuid))
         and (coalesce(s.code,'') || ' ' || coalesce(s.name,'')) ilike :like
@@ -64,7 +64,7 @@ _SEARCH_SQL = text(
     )
     union all
     (
-      select 'user', cast(u.id as text), u.full_name, u.email
+      select 'user', cast(u.id as text), null, u.full_name, u.email
       from users u
       where :inc_users
         and (cast(:scope as uuid) is null or u.clinic_id = cast(:scope as uuid))
@@ -74,7 +74,7 @@ _SEARCH_SQL = text(
     )
     union all
     (
-      select 'clinic', cast(cl.id as text), cl.name, cl.address
+      select 'clinic', cast(cl.id as text), null, cl.name, cl.address
       from clinics cl
       where :inc_clinics and coalesce(cl.name,'') ilike :like
       order by cl.name
@@ -87,6 +87,7 @@ _SEARCH_SQL = text(
 class SearchResult(BaseModel):
     type: str  # equipment | case | user | sector | clinic
     id: str
+    slug: str | None = None  # código legible para URL bonita (equipos/casos)
     title: str
     subtitle: str | None = None
 
@@ -115,6 +116,7 @@ async def global_search(
 
     rows = (await db.execute(_SEARCH_SQL, params)).all()
     results = [
-        SearchResult(type=r.rtype, id=r.rid, title=r.title, subtitle=r.subtitle) for r in rows
+        SearchResult(type=r.rtype, id=r.rid, slug=r.slug, title=r.title, subtitle=r.subtitle)
+        for r in rows
     ]
     return SearchOut(results=results, total=len(results))

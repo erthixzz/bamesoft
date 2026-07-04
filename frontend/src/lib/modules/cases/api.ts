@@ -13,6 +13,7 @@ export interface ListParams {
 export const casesApi = {
   list: (params: ListParams = {}) => api.get<Case[]>('/cases', params),
   get: (id: string) => api.get<Case>(`/cases/${id}`),
+  getByCode: (code: string) => api.get<Case>(`/cases/by-code/${code}`),
   create: (payload: CaseCreate) => api.post<Case>('/cases', payload),
   update: (id: string, payload: CaseUpdate) => api.patch<Case>(`/cases/${id}`, payload),
   accept: (id: string) => api.post<Case>(`/cases/${id}/accept`),

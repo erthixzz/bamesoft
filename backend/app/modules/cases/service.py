@@ -57,6 +57,20 @@ async def get_case(db: AsyncSession, case_id: uuid.UUID, scope: uuid.UUID | None
     return obj
 
 
+async def get_case_by_code(
+    db: AsyncSession, code: str, scope: uuid.UUID | None = None
+) -> Case:
+    stmt = select(Case).where(Case.code == code)
+    obj = (await db.execute(stmt)).scalar_one_or_none()
+    if obj is None:
+        raise NotFound("Caso")
+    if scope is not None:
+        eq = await db.get(Equipment, obj.equipment_id)
+        if eq is None or eq.clinic_id != scope:
+            raise NotFound("Caso")
+    return obj
+
+
 async def create_case(
     db: AsyncSession, payload: CaseCreate, reporter_id: uuid.UUID, scope: uuid.UUID | None = None
 ) -> Case:

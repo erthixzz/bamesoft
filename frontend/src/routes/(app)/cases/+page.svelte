@@ -53,7 +53,7 @@
   }
 
   const rowMenu = (row: Case): CtxItem[] => [
-    { label: 'Ver detalle', icon: Eye, href: `/cases/${row.id}` },
+    { label: 'Ver detalle', icon: Eye, href: `/cases/${row.code}` },
     { divider: true },
     { label: 'Copiar código', icon: Copy, onClick: () => copy(row.code, 'Código copiado') },
   ];
@@ -97,7 +97,7 @@
         {:else if column === 'opened_at'}
           {formatDate(row.opened_at)}
         {:else if column === 'code'}
-          <a class="font-medium text-brand-700 hover:underline" href={`/cases/${row.id}`}>{row.code}</a>
+          <a class="font-medium text-brand-700 hover:underline" href={`/cases/${row.code}`}>{row.code}</a>
         {:else}
           {row[column] ?? '—'}
         {/if}

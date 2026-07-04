@@ -310,7 +310,7 @@
               {#each eqReport.items as r (r.equipment_id)}
                 <tr>
                   <td class="py-3 pr-3">
-                    <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${r.equipment_id}`}>
+                    <a class="font-medium text-brand-700 hover:underline" href={`/equipment/${r.code}`}>
                       {r.code} · {r.name}
                     </a>
                   </td>
@@ -362,7 +362,7 @@
                 <tr>
                   <td class="whitespace-nowrap py-3 pr-3 text-slate-500">{formatDateTime(s.opened_at)}</td>
                   <td class="pr-3">
-                    <a class="font-mono text-xs font-semibold text-brand-700 hover:underline" href={`/cases/${s.case_id}`}>{s.code}</a>
+                    <a class="font-mono text-xs font-semibold text-brand-700 hover:underline" href={`/cases/${s.code}`}>{s.code}</a>
                   </td>
                   <td class="max-w-[180px] truncate pr-3 text-slate-600" title={s.equipment_label}>{s.equipment_label}</td>
                   <td class="pr-3 text-slate-600">

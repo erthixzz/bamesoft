@@ -66,8 +66,10 @@
   import { toasts } from '$lib/stores/toasts';
   import { role } from '$lib/stores/auth';
   import { can, isOneOf } from '$lib/utils/permissions';
+  import { isUuid } from '$lib/utils/slug';
 
   let id = '';
+  let caseId = ''; // UUID real del caso (la URL puede traer el código BMS-…)
   let c: Case | null = null;
   let activities: CaseActivity[] = [];
   let docs: Doc[] = [];
@@ -158,7 +160,7 @@
   }
 
   async function loadDocs() {
-    docs = (await safe(documentsApi.forCase(id))) ?? [];
+    docs = (await safe(documentsApi.forCase(caseId))) ?? [];
     // URLs firmadas para imágenes (fotos + firma) que necesitan visualizarse.
     const imgs = docs.filter((d) => d.type === 'photo' || d.type === 'signature');
     const entries = await Promise.all(
@@ -173,7 +175,10 @@
   async function reload() {
     loading = true;
     try {
-      [c, activities] = await Promise.all([casesApi.get(id), casesApi.activities(id)]);
+      // La URL puede traer el código legible (BMS-…) o un UUID.
+      c = isUuid(id) ? await casesApi.get(id) : await casesApi.getByCode(id);
+      caseId = c.id;
+      activities = await casesApi.activities(caseId);
       hydrateForm(c);
       await loadDocs();
 
@@ -208,7 +213,7 @@
   async function addNote() {
     if (!newNote.trim()) return;
     try {
-      await casesApi.addActivity(id, 'note', newNote);
+      await casesApi.addActivity(caseId, 'note', newNote);
       newNote = '';
       await reload();
     } catch (e) {
@@ -219,7 +224,7 @@
   async function takeCase() {
     accepting = true;
     try {
-      c = await casesApi.accept(id);
+      c = await casesApi.accept(caseId);
       toasts.success('Caso tomado');
       await reload();
     } catch (e) {
@@ -232,7 +237,7 @@
   async function startWork() {
     starting = true;
     try {
-      c = await casesApi.update(id, { status: 'in_progress' });
+      c = await casesApi.update(caseId, { status: 'in_progress' });
       toasts.success('Trabajo iniciado');
       await reload();
     } catch (e) {
@@ -283,7 +288,7 @@
     savingClose = true;
     try {
       const signature_path = await uploadSignatureIfDrawn();
-      c = await casesApi.update(id, {
+      c = await casesApi.update(caseId, {
         type: (fType || c.type) as Case['type'],
         operation_minutes: fOperation.trim() ? Number(fOperation) : null,
         work_performed: fWork.trim() || null,

@@ -87,7 +87,7 @@
         ></span>
       </span>
       <a
-        href={`/cases/${c.id}`}
+        href={`/cases/${c.code}`}
         class="truncate font-mono text-sm font-bold text-slate-900 hover:text-brand-700 hover:underline"
       >
         {c.code}
@@ -103,7 +103,7 @@
 
   <!-- Título + equipo -->
   <div class="min-w-0 pl-1.5">
-    <a href={`/cases/${c.id}`} class="line-clamp-2 text-sm font-semibold text-slate-800 hover:text-brand-700">
+    <a href={`/cases/${c.code}`} class="line-clamp-2 text-sm font-semibold text-slate-800 hover:text-brand-700">
       {c.title}
     </a>
     {#if equipmentName}
@@ -167,7 +167,7 @@
         <Pencil class="h-4 w-4" />
       </button>
       <a
-        href={`/cases/${c.id}`}
+        href={`/cases/${c.code}`}
         class="grid h-7 w-7 place-items-center rounded-lg text-slate-400 transition hover:bg-brand-50 hover:text-brand-600"
         aria-label="Abrir detalle"
         title="Abrir"
