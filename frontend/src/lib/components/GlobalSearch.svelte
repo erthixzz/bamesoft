@@ -53,6 +53,19 @@
     }
   }
 
+  // Caché en memoria por término: los repetidos (o al borrar letras) vuelven
+  // instantáneos sin tocar la red.
+  const CACHE_MAX = 80;
+  const cache = new Map<string, SearchResult[]>();
+
+  function cachePut(term: string, res: SearchResult[]) {
+    if (cache.size >= CACHE_MAX) {
+      const oldest = cache.keys().next().value;
+      if (oldest !== undefined) cache.delete(oldest);
+    }
+    cache.set(term, res);
+  }
+
   function onInput() {
     if (timer) clearTimeout(timer);
     const term = q.trim();
@@ -62,12 +75,24 @@
       loading = false;
       return;
     }
+
+    // Acierto de caché: respuesta inmediata, sin red ni debounce.
+    const hit = cache.get(term.toLowerCase());
+    if (hit) {
+      results = hit;
+      open = true;
+      active = -1;
+      loading = false;
+      return;
+    }
+
     loading = true;
     timer = setTimeout(async () => {
       const mySeq = ++seq;
       try {
         const res = await searchApi.global(term);
         if (mySeq !== seq) return; // llegó tarde: ya hay otra búsqueda en curso
+        cachePut(term.toLowerCase(), res.results);
         results = res.results;
         open = true;
         active = -1;
@@ -76,7 +101,7 @@
       } finally {
         if (mySeq === seq) loading = false;
       }
-    }, 250);
+    }, 200);
   }
 
   function close() {

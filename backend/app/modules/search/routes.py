@@ -1,5 +1,10 @@
 """Búsqueda global: equipos, casos, usuarios, unidades y compañías.
 
+Optimizada para latencia: TODO se resuelve en UNA sola consulta (UNION ALL con
+límite por tipo) en vez de un viaje a la BD por entidad. Cada bloque busca
+sobre una expresión concatenada que coincide con su índice GIN pg_trgm
+(migración 0008), de modo que el ILIKE '%…%' usa índice y no escanea la tabla.
+
 Respeta el aislamiento por clínica (`clinic_scope`) y los roles: usuarios solo
 para admin/clinic_admin; compañías solo para el super admin.
 """
@@ -7,21 +12,76 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import or_, select
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import UserRole
 from app.db.session import get_session
 from app.modules.auth.deps import clinic_scope, require_authenticated
-from app.modules.cases.models import Case
-from app.modules.clinics.models import Clinic
-from app.modules.equipment.models import Equipment
-from app.modules.sectors.models import Sector
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/search", tags=["search"])
 
 _PER_TYPE = 5
+
+# Las expresiones `coalesce(...) || ' ' || ...` deben coincidir EXACTAMENTE con
+# las de los índices GIN trgm de 0008_search_indexes.sql para que el planner
+# los use. Dentro de cada bloque, los aciertos por prefijo se ordenan primero.
+# Nota: se usa cast(... as ...) en vez de `::` porque el `::` choca con el
+# marcador de bind params `:nombre` de SQLAlchemy text() (interpreta `:text`).
+_SEARCH_SQL = text(
+    """
+    (
+      select 'equipment' as rtype, cast(e.id as text) as rid,
+             e.code || ' · ' || e.name as title,
+             nullif(concat_ws(' · ', e.brand, e.model, e.serial_number), '') as subtitle
+      from equipment e
+      where (cast(:scope as uuid) is null or e.clinic_id = cast(:scope as uuid))
+        and (coalesce(e.code,'') || ' ' || coalesce(e.name,'') || ' ' ||
+             coalesce(e.serial_number,'') || ' ' || coalesce(e.brand,'') || ' ' ||
+             coalesce(e.model,'')) ilike :like
+      order by (e.code ilike :prefix or e.name ilike :prefix) desc, e.name
+      limit :per
+    )
+    union all
+    (
+      select 'case', cast(c.id as text), c.code || ' · ' || c.title, e.name
+      from cases c
+      join equipment e on e.id = c.equipment_id
+      where (cast(:scope as uuid) is null or e.clinic_id = cast(:scope as uuid))
+        and (coalesce(c.code,'') || ' ' || coalesce(c.title,'')) ilike :like
+      order by (c.code ilike :prefix) desc, c.created_at desc
+      limit :per
+    )
+    union all
+    (
+      select 'sector', cast(s.id as text), s.name, s.description
+      from sectors s
+      where (cast(:scope as uuid) is null or s.clinic_id = cast(:scope as uuid))
+        and (coalesce(s.code,'') || ' ' || coalesce(s.name,'')) ilike :like
+      order by s.name
+      limit :per
+    )
+    union all
+    (
+      select 'user', cast(u.id as text), u.full_name, u.email
+      from users u
+      where :inc_users
+        and (cast(:scope as uuid) is null or u.clinic_id = cast(:scope as uuid))
+        and (coalesce(u.full_name,'') || ' ' || coalesce(u.email,'')) ilike :like
+      order by (u.full_name ilike :prefix) desc, u.full_name
+      limit :per
+    )
+    union all
+    (
+      select 'clinic', cast(cl.id as text), cl.name, cl.address
+      from clinics cl
+      where :inc_clinics and coalesce(cl.name,'') ilike :like
+      order by cl.name
+      limit :per
+    )
+    """
+)
 
 
 class SearchResult(BaseModel):
@@ -43,74 +103,18 @@ async def global_search(
     current: User = Depends(require_authenticated),
 ):
     scope = clinic_scope(current)
-    like = f"%{q.strip()}%"
-    results: list[SearchResult] = []
+    term = q.strip()
+    params = {
+        "scope": str(scope) if scope is not None else None,
+        "like": f"%{term}%",
+        "prefix": f"{term}%",
+        "per": _PER_TYPE,
+        "inc_users": current.role in (UserRole.ADMIN, UserRole.CLINIC_ADMIN),
+        "inc_clinics": current.role == UserRole.ADMIN,
+    }
 
-    # Equipos ---------------------------------------------------------------
-    eq_stmt = select(Equipment).where(
-        or_(
-            Equipment.code.ilike(like),
-            Equipment.name.ilike(like),
-            Equipment.serial_number.ilike(like),
-            Equipment.brand.ilike(like),
-            Equipment.model.ilike(like),
-        )
-    )
-    if scope is not None:
-        eq_stmt = eq_stmt.where(Equipment.clinic_id == scope)
-    for e in (await db.execute(eq_stmt.limit(_PER_TYPE))).scalars():
-        results.append(
-            SearchResult(
-                type="equipment",
-                id=str(e.id),
-                title=f"{e.code} · {e.name}",
-                subtitle=" · ".join(x for x in [e.brand, e.model, e.serial_number] if x) or None,
-            )
-        )
-
-    # Casos -----------------------------------------------------------------
-    case_stmt = (
-        select(Case, Equipment.name.label("eq_name"))
-        .join(Equipment, Equipment.id == Case.equipment_id)
-        .where(or_(Case.code.ilike(like), Case.title.ilike(like)))
-    )
-    if scope is not None:
-        case_stmt = case_stmt.where(Equipment.clinic_id == scope)
-    for c, eq_name in (await db.execute(case_stmt.limit(_PER_TYPE))).all():
-        results.append(
-            SearchResult(
-                type="case",
-                id=str(c.id),
-                title=f"{c.code} · {c.title}",
-                subtitle=eq_name,
-            )
-        )
-
-    # Unidades de servicio ----------------------------------------------------
-    sec_stmt = select(Sector).where(or_(Sector.name.ilike(like), Sector.code.ilike(like)))
-    if scope is not None:
-        sec_stmt = sec_stmt.where(Sector.clinic_id == scope)
-    for s in (await db.execute(sec_stmt.limit(_PER_TYPE))).scalars():
-        results.append(
-            SearchResult(type="sector", id=str(s.id), title=s.name, subtitle=s.description)
-        )
-
-    # Usuarios (solo quien puede gestionarlos) --------------------------------
-    if current.role in (UserRole.ADMIN, UserRole.CLINIC_ADMIN):
-        u_stmt = select(User).where(or_(User.full_name.ilike(like), User.email.ilike(like)))
-        if scope is not None:
-            u_stmt = u_stmt.where(User.clinic_id == scope)
-        for u in (await db.execute(u_stmt.limit(_PER_TYPE))).scalars():
-            results.append(
-                SearchResult(type="user", id=str(u.id), title=u.full_name, subtitle=u.email)
-            )
-
-    # Compañías (solo super admin) --------------------------------------------
-    if current.role == UserRole.ADMIN:
-        cl_stmt = select(Clinic).where(Clinic.name.ilike(like))
-        for cl in (await db.execute(cl_stmt.limit(_PER_TYPE))).scalars():
-            results.append(
-                SearchResult(type="clinic", id=str(cl.id), title=cl.name, subtitle=cl.address)
-            )
-
+    rows = (await db.execute(_SEARCH_SQL, params)).all()
+    results = [
+        SearchResult(type=r.rtype, id=r.rid, title=r.title, subtitle=r.subtitle) for r in rows
+    ]
     return SearchOut(results=results, total=len(results))
