@@ -68,3 +68,47 @@ export interface OperationsReport {
   daily: DailyPoint[];
   by_reporter: ReporterRow[];
 }
+
+export interface EquipmentReportRow {
+  equipment_id: string;
+  code: string;
+  name: string;
+  sector_name: string | null;
+  cases_total: number;
+  completed: number;
+  incomplete: number;
+  corrective: number;
+  preventive: number;
+  avg_work_hours: number | null;
+  total_operation_minutes: number;
+  last_service_at: string | null;
+}
+
+export interface EquipmentReport {
+  items: EquipmentReportRow[];
+  total: number;
+}
+
+export interface ServiceRow {
+  case_id: string;
+  code: string;
+  title: string;
+  equipment_label: string;
+  engineer_name: string | null;
+  type: string;
+  status: string;
+  completion: string | null;
+  work_performed: string | null;
+  operation_minutes: number | null;
+  opened_at: string | null;
+  assigned_at: string | null;
+  accepted_at: string | null;
+  work_started_at: string | null;
+  finished_at: string | null;
+  closed_at: string | null;
+}
+
+export interface ServicesReport {
+  items: ServiceRow[];
+  total: number;
+}

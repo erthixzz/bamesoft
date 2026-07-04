@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from pydantic import BaseModel, Field
 
 
@@ -78,3 +80,51 @@ class OperationsReport(BaseModel):
     waiting_now: int = 0
     daily: list[DailyPoint] = Field(default_factory=list)
     by_reporter: list[ReporterRow] = Field(default_factory=list)
+
+
+class EquipmentReportRow(BaseModel):
+    """Servicio agregado por equipo (en el rango consultado)."""
+
+    equipment_id: str
+    code: str
+    name: str
+    sector_name: str | None = None
+    cases_total: int = 0
+    completed: int = 0
+    incomplete: int = 0
+    corrective: int = 0
+    preventive: int = 0
+    avg_work_hours: float | None = None
+    total_operation_minutes: int = 0
+    last_service_at: datetime | None = None
+
+
+class EquipmentReport(BaseModel):
+    items: list[EquipmentReportRow] = Field(default_factory=list)
+    total: int = 0
+
+
+class ServiceRow(BaseModel):
+    """Detalle de un servicio: qué se hizo, quién y los tiempos del flujo."""
+
+    case_id: str
+    code: str
+    title: str
+    equipment_label: str
+    engineer_name: str | None = None
+    type: str
+    status: str
+    completion: str | None = None
+    work_performed: str | None = None
+    operation_minutes: int | None = None
+    opened_at: datetime | None = None
+    assigned_at: datetime | None = None
+    accepted_at: datetime | None = None
+    work_started_at: datetime | None = None
+    finished_at: datetime | None = None
+    closed_at: datetime | None = None
+
+
+class ServicesReport(BaseModel):
+    items: list[ServiceRow] = Field(default_factory=list)
+    total: int = 0

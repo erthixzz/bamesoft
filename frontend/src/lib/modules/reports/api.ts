@@ -2,8 +2,10 @@ import { api } from '$lib/api/client';
 import type {
   ComplianceReport,
   DashboardKPIs,
+  EquipmentReport,
   OperationsReport,
   ProductivityReport,
+  ServicesReport,
 } from './types';
 
 export interface RangeParams {
@@ -18,4 +20,8 @@ export const reportsApi = {
     api.get<ProductivityReport>('/reports/productivity', params),
   operations: (params: RangeParams = {}) =>
     api.get<OperationsReport>('/reports/operations', params),
+  equipment: (params: RangeParams = {}) =>
+    api.get<EquipmentReport>('/reports/equipment', params),
+  services: (params: RangeParams & { engineer_id?: string; equipment_id?: string } = {}) =>
+    api.get<ServicesReport>('/reports/services', params),
 };

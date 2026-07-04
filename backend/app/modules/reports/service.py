@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import and_, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.enums import CaseCompletion, CaseStatus
+from app.db.enums import CaseCompletion, CaseStatus, CaseType
 from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
 from app.modules.reports.schemas import (
@@ -15,11 +15,16 @@ from app.modules.reports.schemas import (
     ComplianceReport,
     DailyPoint,
     DashboardKPIs,
+    EquipmentReport,
+    EquipmentReportRow,
     OperationsReport,
     ProductivityReport,
     ProductivityRow,
     ReporterRow,
+    ServiceRow,
+    ServicesReport,
 )
+from app.modules.sectors.models import Sector
 from app.modules.standards.models import EquipmentStandard, Standard
 from app.modules.users.models import User
 
@@ -334,3 +339,121 @@ async def operations(
         daily=daily,
         by_reporter=by_reporter,
     )
+
+
+async def equipment_report(
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
+) -> EquipmentReport:
+    """Servicio agregado por equipo: cuántos casos tuvo, cuántos quedaron
+    completos/incompletos, tipo de trabajo y cuánto se demoró en promedio."""
+    rng = _range_filters(date_from, date_to)
+
+    completed = func.count().filter(Case.completion == CaseCompletion.COMPLETE)
+    incomplete = func.count().filter(Case.completion == CaseCompletion.INCOMPLETE)
+    corrective = func.count().filter(Case.type == CaseType.CORRECTIVE)
+    preventive = func.count().filter(Case.type == CaseType.PREVENTIVE)
+
+    stmt = (
+        select(
+            Equipment.id.label("eid"),
+            Equipment.code,
+            Equipment.name,
+            Sector.name.label("sector_name"),
+            func.count().label("cases_total"),
+            completed.label("completed"),
+            incomplete.label("incomplete"),
+            corrective.label("corrective"),
+            preventive.label("preventive"),
+            func.avg(func.extract("epoch", Case.finished_at - Case.work_started_at)).label("work"),
+            func.coalesce(func.sum(Case.operation_minutes), 0).label("op_min"),
+            func.max(_opened_col()).label("last_at"),
+        )
+        .select_from(Case)
+        .join(Equipment, Equipment.id == Case.equipment_id)
+        .join(Sector, Sector.id == Equipment.sector_id, isouter=True)
+        .where(*rng)
+        .group_by(Equipment.id, Equipment.code, Equipment.name, Sector.name)
+        .order_by(func.count().desc())
+    )
+    if scope is not None:
+        stmt = stmt.where(Equipment.clinic_id == scope)
+    rows = (await db.execute(stmt)).all()
+
+    items = [
+        EquipmentReportRow(
+            equipment_id=str(r.eid),
+            code=r.code,
+            name=r.name,
+            sector_name=r.sector_name,
+            cases_total=r.cases_total or 0,
+            completed=r.completed or 0,
+            incomplete=r.incomplete or 0,
+            corrective=r.corrective or 0,
+            preventive=r.preventive or 0,
+            avg_work_hours=_hours(r.work),
+            total_operation_minutes=int(r.op_min or 0),
+            last_service_at=r.last_at,
+        )
+        for r in rows
+    ]
+    return EquipmentReport(items=items, total=len(items))
+
+
+async def services_report(
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
+    engineer_id: uuid.UUID | None = None,
+    equipment_id: uuid.UUID | None = None,
+    limit: int = 300,
+) -> ServicesReport:
+    """Detalle servicio a servicio: qué se hizo, quién atendió y los tiempos."""
+    rng = _range_filters(date_from, date_to)
+
+    stmt = (
+        select(
+            Case,
+            Equipment.code.label("eq_code"),
+            Equipment.name.label("eq_name"),
+            User.full_name.label("engineer"),
+        )
+        .join(Equipment, Equipment.id == Case.equipment_id)
+        .join(User, User.id == Case.assigned_to, isouter=True)
+        .where(*rng)
+        .order_by(_opened_col().desc())
+        .limit(limit)
+    )
+    if scope is not None:
+        stmt = stmt.where(Equipment.clinic_id == scope)
+    if engineer_id:
+        stmt = stmt.where(Case.assigned_to == engineer_id)
+    if equipment_id:
+        stmt = stmt.where(Case.equipment_id == equipment_id)
+    rows = (await db.execute(stmt)).all()
+
+    items = [
+        ServiceRow(
+            case_id=str(c.id),
+            code=c.code,
+            title=c.title,
+            equipment_label=f"{eq_code} · {eq_name}",
+            engineer_name=engineer,
+            type=c.type,
+            status=c.status,
+            completion=c.completion,
+            work_performed=c.work_performed,
+            operation_minutes=c.operation_minutes,
+            opened_at=c.opened_at,
+            assigned_at=c.assigned_at,
+            accepted_at=c.accepted_at,
+            work_started_at=c.work_started_at,
+            finished_at=c.finished_at,
+            closed_at=c.closed_at,
+        )
+        for c, eq_code, eq_name, engineer in rows
+    ]
+    return ServicesReport(items=items, total=len(items))
