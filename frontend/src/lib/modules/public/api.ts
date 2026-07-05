@@ -4,7 +4,7 @@ const BASE_URL = env.PUBLIC_API_URL ?? 'http://localhost:8000/api/v1';
 
 /** Versión del diseño del QR: subir este número invalida la caché del navegador
  *  cuando cambia el arte del logo incrustado (mismo URL, imagen distinta). */
-const QR_ART_VERSION = 2;
+const QR_ART_VERSION = 3;
 
 /** URL del PNG del QR (para mostrar/descargar/imprimir). El QR codifica la URL
  *  del portón `/e/{code}`, que exige login antes de mostrar cualquier dato. */

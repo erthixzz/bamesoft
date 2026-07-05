@@ -31,4 +31,9 @@ async def public_equipment_qr(
     """PNG del QR (codifica la URL del portón). Sin auth: sirve para <img> e impresión."""
     eq = await service.get_by_qr(db, code, token)
     url = qr.build_url(eq.code, eq.qr_token)
-    return Response(content=qr.render_png(url), media_type="image/png")
+    # no-store: el arte del logo puede cambiar; evita que el navegador sirva uno viejo.
+    return Response(
+        content=qr.render_png(url),
+        media_type="image/png",
+        headers={"Cache-Control": "no-store"},
+    )

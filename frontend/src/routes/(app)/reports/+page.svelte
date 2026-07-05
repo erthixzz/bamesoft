@@ -7,16 +7,25 @@
   import DatePicker from '$lib/components/DatePicker.svelte';
   import Button from '$lib/components/Button.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Donut from '$lib/components/charts/Donut.svelte';
+  import BarList from '$lib/components/charts/BarList.svelte';
   import { reportsApi } from '$lib/modules/reports/api';
   import type {
+    BreakdownReport,
     ComplianceReport,
     EquipmentReport,
     OperationsReport,
     ProductivityReport,
     ServicesReport,
   } from '$lib/modules/reports/types';
-  import type { CaseCompletion, CaseStatus, CaseType } from '$lib/api/types';
-  import { TYPE_LABEL, COMPLETION_LABEL, STATUS_META, elapsedBetween } from '$lib/modules/cases/ui';
+  import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+  import {
+    TYPE_LABEL,
+    COMPLETION_LABEL,
+    STATUS_META,
+    PRIORITY_META,
+    elapsedBetween,
+  } from '$lib/modules/cases/ui';
   import { setPageTitle } from '$lib/stores/page';
   import { formatDate, formatDateTime } from '$lib/utils/format';
   import {
@@ -28,6 +37,9 @@
     Stethoscope,
     ClipboardList,
     ArrowRight,
+    PieChart,
+    Building2,
+    CalendarRange,
   } from 'lucide-svelte';
 
   let compliance: ComplianceReport | null = null;
@@ -35,6 +47,7 @@
   let ops: OperationsReport | null = null;
   let eqReport: EquipmentReport | null = null;
   let services: ServicesReport | null = null;
+  let breakdown: BreakdownReport | null = null;
   let loading = true;
 
   // Rango por defecto: últimos 30 días.
@@ -45,14 +58,54 @@
   let dateTo = iso(today);
 
   // Apartados
-  type Tab = 'resumen' | 'ingenieros' | 'equipos' | 'servicios';
+  type Tab = 'resumen' | 'analitica' | 'ingenieros' | 'equipos' | 'servicios';
   let tab: Tab = 'resumen';
   const TABS: { key: Tab; label: string; icon: typeof Gauge }[] = [
     { key: 'resumen', label: 'Resumen', icon: Gauge },
+    { key: 'analitica', label: 'Analítica', icon: PieChart },
     { key: 'ingenieros', label: 'Por ingeniero', icon: Users },
     { key: 'equipos', label: 'Por equipo', icon: Stethoscope },
     { key: 'servicios', label: 'Servicios', icon: ClipboardList },
   ];
+
+  // ---- Datos para gráficas (mapeados a etiqueta/color) ----
+  const TYPE_COLORS: Record<string, string> = {
+    corrective: '#f97316',
+    preventive: '#10b981',
+    calibration: '#8b5cf6',
+    installation: '#0ea5e9',
+    inspection: '#eab308',
+  };
+  $: statusChart = (breakdown?.by_status ?? []).map((d) => ({
+    label: STATUS_META[d.label as CaseStatus]?.label ?? d.label,
+    value: d.value,
+    color: STATUS_META[d.label as CaseStatus]?.color ?? '#94a3b8',
+  }));
+  $: typeChart = (breakdown?.by_type ?? []).map((d) => ({
+    label: TYPE_LABEL[d.label as CaseType] ?? d.label,
+    value: d.value,
+    color: TYPE_COLORS[d.label] ?? '#64748b',
+  }));
+  $: priorityChart = (breakdown?.by_priority ?? []).map((d) => ({
+    label: PRIORITY_META[d.label as CasePriority]?.label ?? d.label,
+    value: d.value,
+    color: PRIORITY_META[d.label as CasePriority]?.color ?? '#94a3b8',
+  }));
+  $: completionChart = ops
+    ? [
+        { label: 'Completos', value: ops.complete_total, color: '#10b981' },
+        { label: 'Incompletos', value: ops.incomplete_total, color: '#f59e0b' },
+        {
+          label: 'Sin cierre',
+          value: Math.max(0, ops.reported_total - ops.complete_total - ops.incomplete_total),
+          color: '#cbd5e1',
+        },
+      ]
+    : [];
+  $: sectorBars = (breakdown?.by_sector ?? []).map((d) => ({ label: d.label, value: d.value }));
+  $: monthlyBars = (breakdown?.monthly ?? []).map((d) => ({ label: d.label, value: d.value }));
+  $: engineerLoad = (prod?.items ?? []).map((r) => ({ label: r.engineer_name, value: r.attended }));
+  $: engineerFcr = (prod?.items ?? []).map((r) => ({ label: r.engineer_name, value: r.fcr_pct }));
 
   // Filtros del apartado Servicios (sobre los datos ya cargados).
   let fEngineer = '';
@@ -84,12 +137,13 @@
     loading = true;
     try {
       const range = { date_from: dateFrom, date_to: dateTo };
-      [compliance, prod, ops, eqReport, services] = await Promise.all([
+      [compliance, prod, ops, eqReport, services, breakdown] = await Promise.all([
         reportsApi.compliance(),
         reportsApi.productivity(range),
         reportsApi.operations(range),
         reportsApi.equipment(range),
         reportsApi.services(range),
+        reportsApi.breakdown(range),
       ]);
     } finally {
       loading = false;
@@ -231,6 +285,39 @@
             </table>
           </div>
         {/if}
+      </Card>
+    </div>
+  </div>
+{:else if tab === 'analitica'}
+  <!-- ══ ANALÍTICA (gráficas) ══ -->
+  <div class="animate-fade-up space-y-4">
+    <div class="grid gap-4 lg:grid-cols-3">
+      <Card title="Casos por estado" icon={PieChart} accent="brand">
+        <Donut data={statusChart} unit="casos" />
+      </Card>
+      <Card title="Casos por tipo" icon={PieChart} accent="violet">
+        <Donut data={typeChart} unit="casos" />
+      </Card>
+      <Card title="Completitud del servicio" icon={PieChart} accent="emerald">
+        <Donut data={completionChart} unit="casos" />
+      </Card>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <Card title="Casos por unidad de servicio" icon={Building2} accent="cyan">
+        <BarList data={sectorBars} accent="#06b6d4" />
+      </Card>
+      <Card title="Tendencia mensual" description="Casos reportados por mes" icon={CalendarRange} accent="brand">
+        <BarList data={monthlyBars} accent="#1971f5" />
+      </Card>
+      <Card title="Prioridad" icon={PieChart} accent="rose">
+        <Donut data={priorityChart} unit="casos" size={130} />
+      </Card>
+      <Card title="Carga por ingeniero" description="Casos atendidos en el rango" icon={Users} accent="emerald">
+        <BarList data={engineerLoad} accent="#10b981" />
+      </Card>
+      <Card title="FCR por ingeniero" description="% resueltos completos a la primera" icon={Gauge} accent="violet">
+        <BarList data={engineerFcr} suffix="%" accent="#8b5cf6" />
       </Card>
     </div>
   </div>

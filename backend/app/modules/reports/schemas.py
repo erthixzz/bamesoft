@@ -128,3 +128,18 @@ class ServiceRow(BaseModel):
 class ServicesReport(BaseModel):
     items: list[ServiceRow] = Field(default_factory=list)
     total: int = 0
+
+
+class NamedCount(BaseModel):
+    label: str
+    value: int = 0
+
+
+class BreakdownReport(BaseModel):
+    """Distribuciones para gráficas (rango + clínica)."""
+
+    by_status: list[NamedCount] = Field(default_factory=list)
+    by_type: list[NamedCount] = Field(default_factory=list)
+    by_priority: list[NamedCount] = Field(default_factory=list)
+    by_sector: list[NamedCount] = Field(default_factory=list)
+    monthly: list[NamedCount] = Field(default_factory=list)  # label = 'YYYY-MM'

@@ -112,3 +112,16 @@ export interface ServicesReport {
   items: ServiceRow[];
   total: number;
 }
+
+export interface NamedCount {
+  label: string;
+  value: number;
+}
+
+export interface BreakdownReport {
+  by_status: NamedCount[];
+  by_type: NamedCount[];
+  by_priority: NamedCount[];
+  by_sector: NamedCount[];
+  monthly: NamedCount[];
+}

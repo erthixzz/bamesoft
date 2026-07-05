@@ -1,5 +1,6 @@
 import { api } from '$lib/api/client';
 import type {
+  BreakdownReport,
   ComplianceReport,
   DashboardKPIs,
   EquipmentReport,
@@ -24,4 +25,5 @@ export const reportsApi = {
     api.get<EquipmentReport>('/reports/equipment', params),
   services: (params: RangeParams & { engineer_id?: string; equipment_id?: string } = {}) =>
     api.get<ServicesReport>('/reports/services', params),
+  breakdown: (params: RangeParams = {}) => api.get<BreakdownReport>('/reports/breakdown', params),
 };

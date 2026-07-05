@@ -226,16 +226,23 @@
     {/if}
   </div>
 
-  <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#1971f5,#06b6d4);color:#ffffff;border-radius:10px;padding:11px 16px;">
-    <svg width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
-      <defs><linearGradient id="hvGf" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="44" y2="46"><stop offset="0" stop-color="#1e3a8a"/><stop offset="0.5" stop-color="#1971f5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
-      <rect x="1" y="1" width="46" height="46" rx="13" fill="#ffffff"/>
-      <rect x="3" y="3" width="42" height="42" rx="11" fill="url(#hvGf)"/>
-      <g fill="#ffffff"><rect x="12" y="10" width="7.6" height="28" rx="2.6"/><path d="M13 10 h13 a7 7 0 0 1 0 14 H13 Z"/><path d="M13 23 h14 a7.6 7.6 0 0 1 0 15.2 H13 Z"/></g>
-      <g fill="url(#hvGf)"><path d="M19.6 14.3 h5.6 a3.85 3.85 0 0 1 0 7.7 H19.6 Z"/><path d="M19.6 26.7 h6.1 a4.15 4.15 0 0 1 0 8.3 H19.6 Z"/></g>
-      <g fill="#34d399"><rect x="21.3" y="15.7" width="2" height="5.6" rx="0.9"/><rect x="19.5" y="17.5" width="5.6" height="2" rx="0.9"/></g>
-    </svg>
-    <span style="font-size:14px;font-weight:800;letter-spacing:.02em;">Generado con Bamesoft Solutions</span>
-    <span style="font-size:11px;opacity:.9;">· Información protegida</span>
+  <div style="margin-top:18px;border-top:2px solid #1971f5;padding-top:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+    <div style="display:flex;align-items:center;gap:9px;">
+      <svg width="30" height="30" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="hvGf" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="44" y2="46"><stop offset="0" stop-color="#1e3a8a"/><stop offset="0.5" stop-color="#1971f5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+        <rect x="1" y="1" width="46" height="46" rx="13" fill="url(#hvGf)"/>
+        <g fill="#ffffff"><rect x="12" y="10" width="7.6" height="28" rx="2.6"/><path d="M13 10 h13 a7 7 0 0 1 0 14 H13 Z"/><path d="M13 23 h14 a7.6 7.6 0 0 1 0 15.2 H13 Z"/></g>
+        <g fill="url(#hvGf)"><path d="M19.6 14.3 h5.6 a3.85 3.85 0 0 1 0 7.7 H19.6 Z"/><path d="M19.6 26.7 h6.1 a4.15 4.15 0 0 1 0 8.3 H19.6 Z"/></g>
+        <g fill="#34d399"><rect x="21.3" y="15.7" width="2" height="5.6" rx="0.9"/><rect x="19.5" y="17.5" width="5.6" height="2" rx="0.9"/></g>
+      </svg>
+      <div style="line-height:1.2;">
+        <div style="font-size:12.5px;font-weight:800;color:#0f172a;">Bamesoft <span style="color:#1971f5;">Biomedical Suite</span></div>
+        <div style="font-size:8px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#64748b;">IA · Ingeniería clínica · Cumplimiento</div>
+      </div>
+    </div>
+    <div style="text-align:right;line-height:1.5;">
+      <div style="font-size:9px;font-weight:700;color:#475569;">Documento generado con Bamesoft</div>
+      <div style="font-size:8.5px;color:#94a3b8;">Información confidencial · No divulgar sin autorización</div>
+    </div>
   </div>
 </div>

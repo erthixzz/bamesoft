@@ -10,6 +10,7 @@ from app.db.session import get_session
 from app.modules.auth.deps import clinic_scope, require_authenticated
 from app.modules.reports import service
 from app.modules.reports.schemas import (
+    BreakdownReport,
     ComplianceReport,
     DashboardKPIs,
     EquipmentReport,
@@ -82,3 +83,14 @@ async def services_report(
     return await service.services_report(
         db, date_from, date_to, clinic_scope(current), engineer_id, equipment_id
     )
+
+
+@router.get("/breakdown", response_model=BreakdownReport)
+async def breakdown(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_authenticated),
+):
+    """Distribuciones para gráficas (estado, tipo, prioridad, unidad, mes)."""
+    return await service.breakdown(db, date_from, date_to, clinic_scope(current))

@@ -11,12 +11,14 @@ from app.db.enums import CaseCompletion, CaseStatus, CaseType
 from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
 from app.modules.reports.schemas import (
+    BreakdownReport,
     ComplianceItem,
     ComplianceReport,
     DailyPoint,
     DashboardKPIs,
     EquipmentReport,
     EquipmentReportRow,
+    NamedCount,
     OperationsReport,
     ProductivityReport,
     ProductivityRow,
@@ -457,3 +459,48 @@ async def services_report(
         for c, eq_code, eq_name, engineer in rows
     ]
     return ServicesReport(items=items, total=len(items))
+
+
+async def breakdown(
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
+) -> BreakdownReport:
+    """Distribuciones para gráficas: por estado, tipo, prioridad, unidad y mes."""
+    rng = _range_filters(date_from, date_to)
+
+    async def grouped(col) -> list[NamedCount]:
+        stmt = _scope_case(select(col, func.count()).where(*rng), scope).group_by(col)
+        rows = (await db.execute(stmt)).all()
+        return [NamedCount(label=str(k), value=n) for k, n in rows if k is not None]
+
+    by_status = await grouped(Case.status)
+    by_type = await grouped(Case.type)
+    by_priority = await grouped(Case.priority)
+
+    # Por unidad de servicio (vía equipo → sector).
+    sec_stmt = (
+        select(func.coalesce(Sector.name, "Sin unidad"), func.count())
+        .select_from(Case)
+        .join(Equipment, Equipment.id == Case.equipment_id)
+        .join(Sector, Sector.id == Equipment.sector_id, isouter=True)
+        .where(*rng)
+    )
+    if scope is not None:
+        sec_stmt = sec_stmt.where(Equipment.clinic_id == scope)
+    sec_stmt = sec_stmt.group_by(Sector.name).order_by(func.count().desc())
+    by_sector = [NamedCount(label=str(k), value=n) for k, n in (await db.execute(sec_stmt)).all()]
+
+    # Tendencia mensual (YYYY-MM).
+    month = func.to_char(_opened_col(), "YYYY-MM")
+    m_stmt = _scope_case(select(month, func.count()).where(*rng), scope).group_by(month).order_by(month)
+    monthly = [NamedCount(label=str(k), value=n) for k, n in (await db.execute(m_stmt)).all() if k]
+
+    return BreakdownReport(
+        by_status=by_status,
+        by_type=by_type,
+        by_priority=by_priority,
+        by_sector=by_sector,
+        monthly=monthly,
+    )
