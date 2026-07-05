@@ -5,6 +5,7 @@
   import { fly, fade } from 'svelte/transition';
   import { tooltip } from '$lib/actions/tooltip';
   import CaseLegendModal from '$lib/modules/cases/components/CaseLegendModal.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import { role } from '$lib/stores/auth';
   import {
     permissions,
@@ -65,7 +66,7 @@
 <!-- Sidebar fijo en desktop (md+): pegado a la pantalla al hacer scroll -->
 <aside class="sticky top-0 hidden h-screen w-64 shrink-0 flex-col border-r border-slate-200 bg-white md:flex">
   <div class="flex h-16 shrink-0 items-center gap-2 px-5">
-    <div class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 font-bold text-white">B</div>
+    <BrandMark size={32} />
     <div>
       <p class="text-sm font-semibold leading-tight">Bamesoft</p>
       <p class="text-xs text-slate-500">Biomedical Suite</p>
@@ -88,7 +89,7 @@
   <!-- Footer: branding + ayuda -->
   <div class="shrink-0 border-t border-slate-100 p-3">
     <div class="flex items-center gap-2.5 rounded-xl bg-slate-50 p-2.5">
-      <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 text-sm font-bold text-white shadow-sm">B</div>
+      <BrandMark size={32} class="shrink-0" />
       <div class="min-w-0 flex-1">
         <p class="truncate text-xs font-semibold text-slate-700">Bamesoft Solutions</p>
         <p class="truncate text-[10px] text-slate-400">Ingeniería biomédica</p>
@@ -124,7 +125,7 @@
   >
     <div class="flex h-16 shrink-0 items-center justify-between gap-2 px-5">
       <div class="flex items-center gap-2">
-        <div class="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 font-bold text-white">B</div>
+        <BrandMark size={32} />
         <div>
           <p class="text-sm font-semibold leading-tight">Bamesoft</p>
           <p class="text-xs text-slate-500">Biomedical Suite</p>
@@ -151,7 +152,7 @@
     <!-- Footer: branding + ayuda -->
     <div class="shrink-0 border-t border-slate-100 p-3">
       <div class="flex items-center gap-2.5 rounded-xl bg-slate-50 p-2.5">
-        <div class="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-gradient-to-br from-brand-600 to-cyan-500 text-sm font-bold text-white shadow-sm">B</div>
+        <BrandMark size={32} class="shrink-0" />
         <div class="min-w-0 flex-1">
           <p class="truncate text-xs font-semibold text-slate-700">Bamesoft Solutions</p>
           <p class="truncate text-[10px] text-slate-400">Ingeniería biomédica</p>

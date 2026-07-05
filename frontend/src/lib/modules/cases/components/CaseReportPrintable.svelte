@@ -63,7 +63,16 @@
     </div>
     <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;padding:10px 12px;border-left:1px solid #cbd5e1;min-width:210px;">
       <div style="display:flex;align-items:center;gap:8px;">
-        <div style="height:36px;width:36px;border-radius:9px;background:linear-gradient(135deg,#1971f5,#06b6d4);color:#fff;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:22px;box-shadow:0 1px 4px rgba(15,23,42,.2);">B</div>
+        <svg width="40" height="40" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+          <defs><linearGradient id="csG" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="44" y2="46"><stop offset="0" stop-color="#1e3a8a"/><stop offset="0.5" stop-color="#1971f5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+          <rect x="1" y="1" width="46" height="46" rx="13" fill="url(#csG)"/>
+          <g stroke="#ffffff" stroke-opacity="0.08" stroke-width="1"><path d="M1 17 H47 M1 31 H47 M17 1 V47 M31 1 V47"/></g>
+          <g stroke="#7dd3fc" stroke-width="1.4" fill="none" stroke-linecap="round"><path d="M32.5 16 h6"/><path d="M34.5 32 h5"/></g>
+          <g fill="#7dd3fc"><circle cx="39.2" cy="16" r="1.9"/><circle cx="40" cy="32" r="1.7"/></g>
+          <g fill="#ffffff"><rect x="12" y="10" width="7.6" height="28" rx="2.6"/><path d="M13 10 h13 a7 7 0 0 1 0 14 H13 Z"/><path d="M13 23 h14 a7.6 7.6 0 0 1 0 15.2 H13 Z"/></g>
+          <g fill="url(#csG)"><path d="M19.6 14.3 h5.6 a3.85 3.85 0 0 1 0 7.7 H19.6 Z"/><path d="M19.6 26.7 h6.1 a4.15 4.15 0 0 1 0 8.3 H19.6 Z"/></g>
+          <g fill="#34d399"><rect x="21.3" y="15.7" width="2" height="5.6" rx="0.9"/><rect x="19.5" y="17.5" width="5.6" height="2" rx="0.9"/></g>
+        </svg>
         <div style="line-height:1.05;text-align:left;">
           <div style="font-size:20px;font-weight:900;letter-spacing:-.02em;color:#0f172a;">Bamesoft</div>
           <div style="font-size:8px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:#1971f5;">Biomedical Software</div>
@@ -166,7 +175,14 @@
   </div>
 
   <div style="margin-top:14px;display:flex;align-items:center;justify-content:center;gap:10px;background:linear-gradient(135deg,#1971f5,#06b6d4);color:#ffffff;border-radius:10px;padding:11px 16px;">
-    <div style="height:24px;width:24px;border-radius:6px;background:rgba(255,255,255,.2);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:15px;">B</div>
+    <svg width="26" height="26" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+      <defs><linearGradient id="csGf" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="44" y2="46"><stop offset="0" stop-color="#1e3a8a"/><stop offset="0.5" stop-color="#1971f5"/><stop offset="1" stop-color="#06b6d4"/></linearGradient></defs>
+      <rect x="1" y="1" width="46" height="46" rx="13" fill="#ffffff"/>
+      <rect x="3" y="3" width="42" height="42" rx="11" fill="url(#csGf)"/>
+      <g fill="#ffffff"><rect x="12" y="10" width="7.6" height="28" rx="2.6"/><path d="M13 10 h13 a7 7 0 0 1 0 14 H13 Z"/><path d="M13 23 h14 a7.6 7.6 0 0 1 0 15.2 H13 Z"/></g>
+      <g fill="url(#csGf)"><path d="M19.6 14.3 h5.6 a3.85 3.85 0 0 1 0 7.7 H19.6 Z"/><path d="M19.6 26.7 h6.1 a4.15 4.15 0 0 1 0 8.3 H19.6 Z"/></g>
+      <g fill="#34d399"><rect x="21.3" y="15.7" width="2" height="5.6" rx="0.9"/><rect x="19.5" y="17.5" width="5.6" height="2" rx="0.9"/></g>
+    </svg>
     <span style="font-size:14px;font-weight:800;letter-spacing:.02em;">Generado con Bamesoft Solutions</span>
     <span style="font-size:11px;opacity:.9;">· Información protegida</span>
   </div>

@@ -5,6 +5,7 @@
   import { cubicOut } from 'svelte/easing';
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import { login } from '$lib/stores/auth';
   import { toasts } from '$lib/stores/toasts';
   import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-svelte';
@@ -99,10 +100,10 @@
       <header class="mb-5 flex items-center gap-3">
         <a
           href="/"
-          class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-brand-600 to-cyan-500 text-lg font-bold text-white shadow-md transition hover:brightness-110 active:scale-95"
+          class="shrink-0 rounded-xl shadow-md transition hover:brightness-110 active:scale-95"
           aria-label="Volver al inicio"
         >
-          B
+          <BrandMark size={40} />
         </a>
         <div>
           <h2 class="text-base font-semibold text-slate-900">Iniciar sesión</h2>

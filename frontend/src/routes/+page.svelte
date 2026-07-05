@@ -5,6 +5,7 @@
   import { goto } from '$app/navigation';
   import { session } from '$lib/stores/auth';
   import AuthBackdrop from '$lib/components/AuthBackdrop.svelte';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import {
     ArrowRight,
     Brain,
@@ -174,11 +175,10 @@
         >
           <!-- Logo amplio (marca + nombre) -->
           <a href="/" class="group flex min-w-0 shrink-0 items-center gap-2.5 sm:gap-3" on:click={closeMenu}>
-            <span
-              class="logo-mark relative grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl text-base font-black text-white shadow-lg shadow-brand-600/35 ring-2 ring-brand-100 sm:h-14 sm:w-14 sm:text-lg md:h-[3.75rem] md:w-[3.75rem]"
-            >
-              <span class="relative z-10">B</span>
-            </span>
+            <BrandMark
+              size={56}
+              class="h-12 w-12 shrink-0 rounded-2xl shadow-lg shadow-brand-600/35 ring-2 ring-brand-100 sm:h-14 sm:w-14 md:h-[3.75rem] md:w-[3.75rem]"
+            />
             <span class="hidden min-[360px]:flex min-w-0 flex-col leading-tight">
               <span class="logo-wordmark text-base font-black tracking-tight sm:text-lg md:text-xl"
                 >Bamesoft</span
@@ -704,21 +704,6 @@
     }
     .nav-pill-desk:hover::after {
       width: 55%;
-    }
-  }
-
-  .logo-mark {
-    background: linear-gradient(135deg, #2f8eff 0%, #1971f5 35%, #06b6d4 70%, #10b981 100%);
-    background-size: 200% 200%;
-    animation: logo-gradient 8s ease infinite;
-  }
-  @keyframes logo-gradient {
-    0%,
-    100% {
-      background-position: 0% 50%;
-    }
-    50% {
-      background-position: 100% 50%;
     }
   }
 

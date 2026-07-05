@@ -6,6 +6,7 @@
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
   import { supabase } from '$lib/supabase';
+  import BrandMark from '$lib/components/BrandMark.svelte';
   import { ShieldCheck } from 'lucide-svelte';
 
   onMount(async () => {
@@ -28,7 +29,7 @@
 
 <div class="grid min-h-screen place-items-center bg-gradient-to-b from-slate-50 via-white to-slate-100 px-6">
   <div class="flex flex-col items-center gap-4 text-center">
-    <img src="/logo.png" alt="Bamesoft" class="h-14 w-14 object-contain" />
+    <BrandMark size={56} class="shadow-lg shadow-brand-600/25" />
     <div class="flex items-center gap-2 text-sm font-medium text-slate-600">
       <span class="h-4 w-4 animate-spin rounded-full border-2 border-slate-200 border-t-brand-600"></span>
       Verificando acceso seguro…

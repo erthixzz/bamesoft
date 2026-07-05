@@ -7,15 +7,17 @@ import secrets
 from urllib.parse import parse_qs, quote, urlparse
 
 import qrcode
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 
 from app.core.config import settings
 
 QR_VERSION = 1
 
-# Colores de marca (gradiente del logo Bamesoft: brand-600 -> cyan-500).
-_BRAND_FROM = (25, 113, 245)  # #1971f5
+# Colores de marca (gradiente del logo Bamesoft: azul profundo -> cian).
+_BRAND_FROM = (30, 58, 138)  # #1e3a8a (profundidad)
 _BRAND_TO = (6, 182, 212)  # #06b6d4
+_CYAN = (125, 211, 252)  # #7dd3fc (circuito IA)
+_EMERALD = (52, 211, 153)  # #34d399 (cruz médica)
 
 
 def new_token() -> str:
@@ -84,7 +86,8 @@ def _diagonal_gradient(size: tuple[int, int], c1: tuple[int, int, int], c2: tupl
 
 
 def _brand_badge(box: int) -> Image.Image:
-    """Insignia de marca: placa blanca + cuadro con degradado y la 'B' centrada."""
+    """Insignia de marca (mismo monograma vectorial de la app): placa blanca +
+    cuadro con degradado, grilla técnica, 'B' sólida, cruz médica y circuito."""
     scale = 4  # supermuestreo para bordes nítidos
     s = box * scale
     img = Image.new("RGBA", (s, s), (0, 0, 0, 0))
@@ -94,24 +97,47 @@ def _brand_badge(box: int) -> Image.Image:
     draw.rounded_rectangle([0, 0, s - 1, s - 1], radius=int(s * 0.26), fill=(255, 255, 255, 255))
 
     # Cuadro de marca con degradado.
-    pad = int(s * 0.12)
+    pad = int(s * 0.1)
     inner = s - 2 * pad
     grad = _diagonal_gradient((inner, inner), _BRAND_FROM, _BRAND_TO).convert("RGBA")
-    mask = Image.new("L", (inner, inner), 0)
-    ImageDraw.Draw(mask).rounded_rectangle(
-        [0, 0, inner - 1, inner - 1], radius=int(inner * 0.24), fill=255
+    gmask = Image.new("L", (inner, inner), 0)
+    ImageDraw.Draw(gmask).rounded_rectangle(
+        [0, 0, inner - 1, inner - 1], radius=int(inner * 0.27), fill=255
     )
-    img.paste(grad, (pad, pad), mask)
+    img.paste(grad, (pad, pad), gmask)
 
-    # Letra "B" blanca centrada.
-    try:
-        font = ImageFont.load_default(size=int(inner * 0.72))
-    except TypeError:  # Pillow < 10
-        font = ImageFont.load_default()
-    draw = ImageDraw.Draw(img)
-    bbox = draw.textbbox((0, 0), "B", font=font)
-    tw, th = bbox[2] - bbox[0], bbox[3] - bbox[1]
-    draw.text(((s - tw) / 2 - bbox[0], (s - th) / 2 - bbox[1]), "B", font=font, fill=(255, 255, 255, 255))
+    d = ImageDraw.Draw(img)
+    u = inner / 48.0
+
+    def gx(x: float) -> float:  # coords 48-grid -> píxel global
+        return pad + x * u
+
+    white = (255, 255, 255, 255)
+
+    # Trazas + nodos de circuito (cian).
+    tw = max(1, int(1.4 * u))
+    d.line([gx(32.5), gx(16), gx(38.5), gx(16)], fill=_CYAN, width=tw)
+    d.line([gx(34.5), gx(32), gx(39.5), gx(32)], fill=_CYAN, width=tw)
+    for cx, cy, r in [(39.2, 16, 1.9), (40, 32, 1.7)]:
+        d.ellipse([gx(cx - r), gx(cy - r), gx(cx + r), gx(cy + r)], fill=_CYAN)
+
+    # "B" sólida blanca: espina + dos bombas (rectángulos redondeados; el lado
+    # izquierdo redondeado queda oculto tras la espina).
+    d.rounded_rectangle([gx(12), gx(10), gx(19.6), gx(38)], radius=int(2.6 * u), fill=white)
+    d.rounded_rectangle([gx(13), gx(10), gx(32.5), gx(24)], radius=int(7 * u), fill=white)
+    d.rounded_rectangle([gx(13), gx(23), gx(34.6), gx(38)], radius=int(7.5 * u), fill=white)
+
+    # Contra-huecos: repegar el degradado con máscara.
+    cmask = Image.new("L", (inner, inner), 0)
+    cd = ImageDraw.Draw(cmask)
+    cd.rounded_rectangle([19.6 * u, 14.3 * u, 29 * u, 22 * u], radius=int(3.8 * u), fill=255)
+    cd.rounded_rectangle([19.6 * u, 26.7 * u, 30 * u, 35 * u], radius=int(4.1 * u), fill=255)
+    img.paste(grad, (pad, pad), cmask)
+
+    # Cruz médica (esmeralda) en el hueco superior.
+    d = ImageDraw.Draw(img)
+    d.rounded_rectangle([gx(21.3), gx(15.7), gx(23.3), gx(21.3)], radius=int(0.9 * u), fill=_EMERALD)
+    d.rounded_rectangle([gx(19.5), gx(17.5), gx(25.1), gx(19.5)], radius=int(0.9 * u), fill=_EMERALD)
 
     return img.resize((box, box), Image.LANCZOS)
 
