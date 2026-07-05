@@ -181,11 +181,12 @@
         <Select
           label="Asignar a ingeniero"
           bind:value={form.assigned_to}
+          placeholder="Sin asignar"
           options={engineers.map((u) => ({ value: u.id, label: `${u.full_name} (${u.role})` }))}
         />
         <p class="text-xs text-slate-500">
-          Si dejas el ingeniero en blanco, se asigna automáticamente al ingeniero por
-          defecto de la unidad (si tiene uno).
+          Puedes dejarlo <strong>Sin asignar</strong>. Si eliges unidad y la dejas en blanco, se
+          asigna automáticamente al ingeniero por defecto de la unidad (si tiene uno).
         </p>
         <DatePicker label="SLA (fecha límite)" mode="datetime" bind:value={form.sla_due_at} />
       </div>

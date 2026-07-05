@@ -39,11 +39,16 @@
     popWidth = r.width;
   }
 
+  let openedAt = 0; // marca de tiempo de apertura (para ignorar el click fantasma móvil)
+  let isMobile = false; // en móvil se abre como hoja inferior (bottom sheet)
+
   function openMenu() {
     if (disabled) return;
-    positionPopup();
+    isMobile = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+    if (!isMobile) positionPopup();
     active = options.findIndex((o) => o.value === value);
     open = true;
+    openedAt = Date.now();
   }
   function close() {
     open = false;
@@ -51,6 +56,13 @@
   }
   function toggle() {
     open ? close() : openMenu();
+  }
+
+  /** Cierre por tocar fuera: en móvil, el mismo tap que abre genera un "click
+   *  fantasma" sobre el backdrop recién montado; lo ignoramos ~350 ms. */
+  function backdropClose() {
+    if (Date.now() - openedAt < 350) return;
+    close();
   }
 
   function pick(v: string) {
@@ -133,50 +145,94 @@
 
 {#if open}
   <div use:portal>
-    <!-- Backdrop transparente: cierra al click fuera (z-index inline, sin depender de JIT) -->
-    <button
-      type="button"
-      class="fixed inset-0 cursor-default"
-      style="z-index:9998;"
-      aria-label="Cerrar lista"
-      on:click={close}
-    ></button>
-    <div
-      bind:this={listEl}
-      role="listbox"
-      tabindex="-1"
-      class="fixed max-h-[264px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15"
-      style="top:{popTop}px; left:{popLeft}px; width:{popWidth}px; z-index:9999;"
-    >
-    {#if placeholder && !required}
+    {#if isMobile}
+      <!-- Móvil: hoja inferior (bottom sheet), fiable y con toques grandes -->
       <button
         type="button"
-        role="option"
-        aria-selected={!selected}
-        class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-slate-50"
-        on:click={() => pick('')}
+        class="fixed inset-0 bg-slate-900/40 backdrop-blur-[1px]"
+        style="z-index:9998;"
+        aria-label="Cerrar lista"
+        on:click={backdropClose}
+      ></button>
+      <div
+        role="listbox"
+        tabindex="-1"
+        class="fixed inset-x-0 bottom-0 max-h-[75vh] overflow-y-auto rounded-t-2xl border-t border-slate-200 bg-white pb-[max(12px,env(safe-area-inset-bottom))] pt-2 shadow-2xl"
+        style="z-index:9999;"
       >
-        {placeholder}
-      </button>
-    {/if}
-    {#each options as o, i (o.value)}
-      <button
-        type="button"
-        role="option"
-        aria-selected={o.value === value}
-        class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition
-          {o.value === value ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-700'}
-          {i === active && o.value !== value ? 'bg-slate-100' : ''}
-          {i === active ? '' : 'hover:bg-slate-50'}"
-        on:click={() => pick(o.value)}
-        on:mouseenter={() => (active = i)}
-      >
-        <span class="truncate">{o.label}</span>
-        {#if o.value === value}
-          <Check class="h-4 w-4 shrink-0 text-brand-600" />
+        <div class="mx-auto mb-2 h-1.5 w-10 rounded-full bg-slate-300"></div>
+        {#if label}
+          <p class="px-4 pb-2 text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</p>
         {/if}
-      </button>
-    {/each}
-    </div>
+        {#if placeholder && !required}
+          <button
+            type="button"
+            role="option"
+            aria-selected={!selected}
+            class="flex w-full items-center gap-2 px-4 py-3.5 text-left text-base text-slate-500 active:bg-slate-100"
+            on:click={() => pick('')}
+          >
+            {placeholder}
+          </button>
+        {/if}
+        {#each options as o (o.value)}
+          <button
+            type="button"
+            role="option"
+            aria-selected={o.value === value}
+            class="flex w-full items-center justify-between gap-2 px-4 py-3.5 text-left text-base active:bg-slate-100
+              {o.value === value ? 'bg-brand-50 font-semibold text-brand-700' : 'text-slate-700'}"
+            on:click={() => pick(o.value)}
+          >
+            <span class="truncate">{o.label}</span>
+            {#if o.value === value}<Check class="h-5 w-5 shrink-0 text-brand-600" />{/if}
+          </button>
+        {/each}
+      </div>
+    {:else}
+      <!-- Escritorio: menú anclado al campo -->
+      <button
+        type="button"
+        class="fixed inset-0 cursor-default"
+        style="z-index:9998;"
+        aria-label="Cerrar lista"
+        on:click={backdropClose}
+      ></button>
+      <div
+        bind:this={listEl}
+        role="listbox"
+        tabindex="-1"
+        class="fixed max-h-[264px] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-2xl shadow-slate-900/15"
+        style="top:{popTop}px; left:{popLeft}px; width:{popWidth}px; z-index:9999;"
+      >
+        {#if placeholder && !required}
+          <button
+            type="button"
+            role="option"
+            aria-selected={!selected}
+            class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition hover:bg-slate-50"
+            on:click={() => pick('')}
+          >
+            {placeholder}
+          </button>
+        {/if}
+        {#each options as o, i (o.value)}
+          <button
+            type="button"
+            role="option"
+            aria-selected={o.value === value}
+            class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition
+              {o.value === value ? 'bg-brand-50 font-medium text-brand-700' : 'text-slate-700'}
+              {i === active && o.value !== value ? 'bg-slate-100' : ''}
+              {i === active ? '' : 'hover:bg-slate-50'}"
+            on:click={() => pick(o.value)}
+            on:mouseenter={() => (active = i)}
+          >
+            <span class="truncate">{o.label}</span>
+            {#if o.value === value}<Check class="h-4 w-4 shrink-0 text-brand-600" />{/if}
+          </button>
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}

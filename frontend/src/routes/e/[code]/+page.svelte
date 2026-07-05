@@ -145,16 +145,25 @@
         </div>
       </section>
 
-      <!-- CTA reportar (destacada, interactiva) -->
+      <!-- CTA reportar: grande, con marca y animado -->
       {#if authed}
         <a
           href={newCaseHref}
-          class="animate-glow-breathe group relative mt-4 flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 px-6 py-4 text-base font-bold text-white shadow-lg transition active:scale-[0.98] hover:brightness-110"
-          style="--glow:rgba(6,182,212,.55)"
+          class="animate-float group relative mt-5 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-cyan-500 to-brand-600 px-5 py-4 text-white shadow-xl shadow-brand-600/30 transition active:scale-[0.98] animate-gradient"
+          aria-label="Reportar un caso para este equipo"
         >
-          <span class="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/30 to-transparent transition group-hover:translate-x-full duration-700"></span>
-          <Wrench class="h-5 w-5" /> Reportar caso
-          <ArrowRight class="h-5 w-5 transition group-hover:translate-x-1" />
+          <!-- brillo que se desliza en bucle -->
+          <span class="pointer-events-none absolute inset-y-0 left-0 w-1/3 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shine"></span>
+          <span class="relative grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-white/20 ring-1 ring-white/30 backdrop-blur">
+            <Wrench class="h-6 w-6" />
+          </span>
+          <span class="relative flex min-w-0 flex-col leading-tight">
+            <span class="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/80">Acción rápida</span>
+            <span class="text-lg font-extrabold">Reportar un caso</span>
+          </span>
+          <span class="relative ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 transition group-hover:translate-x-0.5 group-hover:bg-white/30">
+            <ArrowRight class="h-5 w-5" />
+          </span>
         </a>
       {/if}
 
