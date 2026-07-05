@@ -17,8 +17,11 @@
   import type { Case } from '$lib/modules/cases/types';
   import { STATUS_META, TYPE_LABEL, isActive } from '$lib/modules/cases/ui';
   import { formatDate } from '$lib/utils/format';
-  import { role } from '$lib/stores/auth';
-  import { can } from '$lib/utils/permissions';
+  import { get } from 'svelte/store';
+  import { role, profile } from '$lib/stores/auth';
+  import { authApi } from '$lib/modules/auth/api';
+  import { accessApi } from '$lib/modules/access/api';
+  import { can, setPermissions } from '$lib/utils/permissions';
   import {
     Wrench, ArrowRight, Building2, Hash, Cpu, ShieldCheck, Activity,
     CalendarClock, AlertTriangle, ExternalLink,
@@ -30,6 +33,7 @@
   let sectorName = '';
   let loading = true;
   let error: string | null = null;
+  let authed = false; // sesión válida confirmada
 
   const EQ_STATUS: Record<string, { label: string; cls: string; dot: string }> = {
     operational: { label: 'Operativo', cls: 'bg-emerald-50 text-emerald-700 ring-emerald-200', dot: 'bg-emerald-500' },
@@ -49,6 +53,20 @@
       goto(`/login?next=${encodeURIComponent(here)}`, { replaceState: true });
       return;
     }
+    authed = true;
+    // Esta ruta no está bajo el layout (app): cargamos perfil + matriz de roles
+    // aquí para que `$role` y `can.*` funcionen (si no, el botón se ocultaría).
+    if (!get(profile)) {
+      try {
+        profile.set(await authApi.whoami());
+      } catch {
+        /* la ficha funciona igual sin perfil */
+      }
+    }
+    accessApi
+      .getRoles()
+      .then((r) => setPermissions(r.matrix))
+      .catch(() => {});
     try {
       eq = await equipmentApi.byCode(code);
       const eqId = eq.id;
@@ -128,7 +146,7 @@
       </section>
 
       <!-- CTA reportar (destacada, interactiva) -->
-      {#if can.reportCase($role)}
+      {#if authed}
         <a
           href={newCaseHref}
           class="animate-glow-breathe group relative mt-4 flex items-center justify-center gap-2 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-brand-500 to-cyan-500 px-6 py-4 text-base font-bold text-white shadow-lg transition active:scale-[0.98] hover:brightness-110"
@@ -194,7 +212,7 @@
   </main>
 
   <!-- CTA fija inferior (móvil): siempre a mano para reportar -->
-  {#if eq && can.reportCase($role)}
+  {#if eq && authed}
     <div class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/90 p-3 backdrop-blur-xl sm:hidden">
       <a
         href={newCaseHref}
