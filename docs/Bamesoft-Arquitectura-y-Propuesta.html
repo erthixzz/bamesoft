@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Bamesoft · Arquitectura y Propuesta de Valor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --navy: #1e3a8a;
+    --brand: #1971f5;
+    --cyan: #06b6d4;
+    --emerald: #34d399;
+    --ink: #0f172a;
+    --slate: #475569;
+    --muted: #94a3b8;
+    --line: #e2e8f0;
+    --bg: #f8fafc;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+    color: var(--ink);
+    background: #eef2f7;
+    line-height: 1.6;
+  }
+  .sheet {
+    max-width: 900px;
+    margin: 24px auto;
+    background: #fff;
+    box-shadow: 0 10px 40px rgba(15, 23, 42, 0.12);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .pad { padding: 48px 56px; }
+
+  /* ---------- Portada ---------- */
+  .cover {
+    background:
+      radial-gradient(120% 90% at 100% 0%, rgba(6, 182, 212, 0.35), transparent 55%),
+      radial-gradient(120% 90% at 0% 100%, rgba(52, 211, 153, 0.25), transparent 55%),
+      linear-gradient(135deg, var(--navy), var(--brand) 55%, var(--cyan));
+    color: #fff;
+    padding: 72px 56px 64px;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(to right, rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(255, 255, 255, 0.06) 1px, transparent 1px);
+    background-size: 26px 26px;
+    pointer-events: none;
+  }
+  .cover > * { position: relative; z-index: 1; }
+  .brandrow { display: flex; align-items: center; gap: 14px; }
+  .brandrow .name { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+  .cover h1 {
+    font-size: 46px; font-weight: 900; letter-spacing: -0.03em;
+    margin: 40px 0 14px; line-height: 1.08;
+  }
+  .cover .lead { font-size: 18px; color: rgba(255, 255, 255, 0.9); max-width: 560px; }
+  .pills { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 34px; }
+  .pill {
+    background: rgba(255, 255, 255, 0.16);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+    backdrop-filter: blur(4px);
+    padding: 7px 14px; border-radius: 999px; font-size: 13px; font-weight: 600;
+  }
+  .cover .foot { margin-top: 52px; font-size: 13px; color: rgba(255, 255, 255, 0.75); }
+
+  /* ---------- Tipografía secciones ---------- */
+  .kicker {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-size: 12px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.08em; color: var(--brand);
+    background: #eff6ff; padding: 5px 12px; border-radius: 999px;
+  }
+  h2 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; margin: 16px 0 6px; }
+  h3 { font-size: 19px; font-weight: 700; margin: 28px 0 8px; color: var(--navy); }
+  p { color: var(--slate); margin: 10px 0; }
+  .subtitle { color: var(--muted); font-size: 15px; margin-top: 0; }
+  strong { color: var(--ink); }
+  ul { color: var(--slate); padding-left: 20px; }
+  li { margin: 6px 0; }
+
+  /* ---------- Diagrama card ---------- */
+  .diagram {
+    border: 1px solid var(--line); border-radius: 14px;
+    background: linear-gradient(180deg, #fff, #fbfdff);
+    padding: 26px; margin: 22px 0;
+    break-inside: avoid;
+  }
+  .diagram .cap { font-size: 13px; font-weight: 700; color: var(--navy); margin-bottom: 14px; display: flex; gap: 8px; align-items: center; }
+  .diagram .cap .num {
+    display: grid; place-items: center; width: 24px; height: 24px; border-radius: 7px;
+    background: linear-gradient(135deg, var(--brand), var(--cyan)); color: #fff; font-size: 12px; font-weight: 800;
+  }
+  .mermaid { display: flex; justify-content: center; }
+  .mermaid svg { max-width: 100%; height: auto; }
+
+  /* ---------- Grids de valor / features ---------- */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 20px 0; }
+  .grid.three { grid-template-columns: 1fr 1fr 1fr; }
+  .box {
+    border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+    background: #fff; break-inside: avoid;
+  }
+  .box .t { font-weight: 700; color: var(--ink); font-size: 15px; margin-bottom: 4px; }
+  .box .d { font-size: 13.5px; color: var(--slate); }
+  .box .ic { font-size: 22px; margin-bottom: 8px; display: block; }
+
+  /* ---------- Tabla ---------- */
+  table { width: 100%; border-collapse: collapse; margin: 18px 0; font-size: 14px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); }
+  th { background: #f1f5f9; color: var(--navy); font-weight: 700; font-size: 12.5px; text-transform: uppercase; letter-spacing: 0.03em; }
+  tr:last-child td { border-bottom: none; }
+  .price { font-weight: 800; color: var(--brand); white-space: nowrap; }
+  .highlight-row td { background: #eff6ff; }
+
+  .callout {
+    border-left: 4px solid var(--emerald);
+    background: #ecfdf5; border-radius: 0 10px 10px 0;
+    padding: 14px 18px; margin: 20px 0; font-size: 14px; color: #065f46;
+  }
+  .callout strong { color: #064e3b; }
+
+  .divider { height: 1px; background: var(--line); margin: 40px 0; }
+
+  footer.doc {
+    text-align: center; color: var(--muted); font-size: 12.5px;
+    padding: 30px; border-top: 1px solid var(--line);
+  }
+
+  /* ---------- Impresión / PDF ---------- */
+  @media print {
+    body { background: #fff; }
+    .sheet { box-shadow: none; margin: 0; max-width: none; border-radius: 0; }
+    .page-break { page-break-before: always; }
+    .diagram, .box, tr { break-inside: avoid; }
+    .cover { padding: 60px 48px; }
+    @page { margin: 14mm; }
+    .no-print { display: none; }
+  }
+  .toolbar {
+    position: sticky; top: 0; z-index: 50; background: var(--navy); color: #fff;
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 10px 18px; font-size: 13px;
+  }
+  .toolbar button {
+    background: #fff; color: var(--navy); border: none; border-radius: 8px;
+    padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<div class="toolbar no-print">
+  <span>📄 Documento listo para PDF — pulsa el botón o usa Ctrl/Cmd + P → “Guardar como PDF”.</span>
+  <button onclick="window.print()">Descargar PDF</button>
+</div>
+
+<div class="sheet">
+
+  <!-- ============ PORTADA ============ -->
+  <section class="cover">
+    <div class="brandrow">
+      <!-- Monograma B vectorial -->
+      <svg viewBox="0 0 48 48" width="44" height="44" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="bmG" gradientUnits="userSpaceOnUse" x1="4" y1="2" x2="44" y2="46">
+          <stop offset="0" stop-color="#0b2b6b"/><stop offset="0.5" stop-color="#1971f5"/><stop offset="1" stop-color="#06b6d4"/>
+        </linearGradient></defs>
+        <rect x="1" y="1" width="46" height="46" rx="13" fill="#ffffff"/>
+        <g fill="url(#bmG)">
+          <rect x="12" y="10" width="7.6" height="28" rx="2.6"/>
+          <path d="M13 10 h13 a7 7 0 0 1 0 14 H13 Z"/>
+          <path d="M13 23 h14 a7.6 7.6 0 0 1 0 15.2 H13 Z"/>
+        </g>
+        <g fill="#ffffff">
+          <path d="M19.6 14.3 h5.6 a3.85 3.85 0 0 1 0 7.7 H19.6 Z"/>
+          <path d="M19.6 26.7 h6.1 a4.15 4.15 0 0 1 0 8.3 H19.6 Z"/>
+        </g>
+        <g fill="#34d399">
+          <rect x="21.3" y="15.7" width="2" height="5.6" rx="0.9"/>
+          <rect x="19.5" y="17.5" width="5.6" height="2" rx="0.9"/>
+        </g>
+      </svg>
+      <span class="name">Bamesoft</span>
+    </div>
+
+    <h1>Plataforma inteligente de gestión de equipos biomédicos</h1>
+    <p class="lead">Trazabilidad total del ciclo de vida de cada equipo, gestión de casos de servicio con evidencia digital, y cumplimiento normativo — en una sola plataforma en la nube.</p>
+
+    <div class="pills">
+      <span class="pill">Multi-tenant seguro</span>
+      <span class="pill">QR en cada equipo</span>
+      <span class="pill">Reportes &amp; BI</span>
+      <span class="pill">Firma &amp; PDF de servicio</span>
+      <span class="pill">Asistente IA</span>
+      <span class="pill">100% responsive</span>
+    </div>
+
+    <p class="foot">Documento técnico-comercial · Arquitectura, flujos y propuesta de valor</p>
+  </section>
+
+  <!-- ============ RESUMEN EJECUTIVO ============ -->
+  <div class="pad">
+    <span class="kicker">Resumen ejecutivo</span>
+    <h2>Qué resuelve Bamesoft</h2>
+    <p>Las clínicas y hospitales están <strong>obligados por ley</strong> (habilitación Res. 3100, tecnovigilancia INVIMA) a mantener sus equipos biomédicos inventariados, con cronogramas de mantenimiento, calibraciones y evidencia de cada intervención. Hacerlo en Excel y papel es lento, se pierde información y expone a <strong>sanciones y equipos críticos fuera de servicio</strong>.</p>
+    <p>Bamesoft centraliza todo el ciclo de vida del equipo — desde el ingreso al inventario, pasando por cada falla, mantenimiento y calibración, hasta su baja — con <strong>trazabilidad completa, evidencia fotográfica, firma del receptor y reportes en PDF</strong>. Cada equipo lleva un QR que, al escanearse, lleva al personal a reportar un caso en segundos.</p>
+
+    <div class="grid three">
+      <div class="box"><span class="ic">🛡️</span><div class="t">Cumplimiento</div><div class="d">Evidencia auditable de cada intervención, cronogramas y estados de riesgo listos para auditoría.</div></div>
+      <div class="box"><span class="ic">⚡</span><div class="t">Velocidad</div><div class="d">Reportar un caso desde el QR toma segundos. Búsqueda global de cualquier dato en &lt;1s.</div></div>
+      <div class="box"><span class="ic">📊</span><div class="t">Visibilidad</div><div class="d">Indicadores por ingeniero, equipo, unidad y tiempos de respuesta. Decisiones con datos.</div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 1 · ARQUITECTURA ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Arquitectura</span>
+    <h2>Cómo está construida la plataforma</h2>
+    <p class="subtitle">Arquitectura moderna en la nube, separada en capas, escalable y segura.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">1</span> Arquitectura del sistema (despliegue en la nube)</div>
+      <pre class="mermaid">
+flowchart TB
+  subgraph U["👥 Usuarios"]
+    direction LR
+    U1["Admin / Super Admin"]
+    U2["Ingeniero biomédico"]
+    U3["Operario / Técnico"]
+    U4["📱 Personal · escanea QR"]
+  end
+
+  subgraph FE["🖥️ Frontend · SvelteKit + Tailwind · Vercel"]
+    direction LR
+    F1["App web responsive"]
+    F2["Ficha móvil QR /e/:code"]
+    F3["Asistente IA + Búsqueda global"]
+  end
+
+  subgraph BE["⚙️ Backend · FastAPI (async) · API REST /api/v1"]
+    direction LR
+    B1["Autenticación & sesiones"]
+    B2["16 módulos de negocio"]
+    B3["🔒 Capa multi-tenant · clinic_scope"]
+  end
+
+  subgraph SB["☁️ Supabase · AWS us-west-2"]
+    direction LR
+    S1[("PostgreSQL")]
+    S2["Auth · JWT"]
+    S3["Storage · fotos / PDF / firmas"]
+  end
+
+  U --> FE
+  FE -->|"HTTPS + JWT"| BE
+  B2 --> B3
+  B3 --> S1
+  B1 --> S2
+  B2 --> S3
+
+  classDef fe fill:#eff6ff,stroke:#1971f5,color:#0f172a;
+  classDef be fill:#ecfeff,stroke:#06b6d4,color:#0f172a;
+  classDef sb fill:#f0fdf4,stroke:#34d399,color:#0f172a;
+  class F1,F2,F3 fe; class B1,B2,B3 be; class S1,S2,S3 sb;
+      </pre>
+    </div>
+
+    <div class="grid">
+      <div class="box"><div class="t">Frontend (SvelteKit)</div><div class="d">Interfaz rápida y 100% responsive, desplegada en Vercel. Incluye la app de escritorio, la ficha móvil por QR y el asistente IA.</div></div>
+      <div class="box"><div class="t">Backend (FastAPI)</div><div class="d">API REST asíncrona con 16 módulos de negocio. Todo dato que sale pasa por la capa de aislamiento por clínica.</div></div>
+      <div class="box"><div class="t">Base de datos (PostgreSQL)</div><div class="d">Supabase gestionado en AWS. Modelo relacional robusto con integridad referencial y búsqueda por índices trigram.</div></div>
+      <div class="box"><div class="t">Auth &amp; Storage</div><div class="d">Contraseñas gestionadas por Supabase Auth (nunca en la app). Archivos (fotos, firmas, PDF) en almacenamiento seguro.</div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 2 · MÓDULOS ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Funcionalidad</span>
+    <h2>Módulos de la plataforma</h2>
+    <p class="subtitle">Todo lo que un servicio de ingeniería biomédica necesita, en un solo lugar.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">2</span> Mapa de módulos funcionales</div>
+      <pre class="mermaid">
+flowchart LR
+  CORE(("Bamesoft"))
+  CORE --- M1["🏥 Compañías & Sedes"]
+  CORE --- M2["🔧 Equipos + QR"]
+  CORE --- M3["🗂️ Unidades de servicio"]
+  CORE --- M4["🛠️ Casos de servicio"]
+  CORE --- M5["📅 Mantenimiento"]
+  CORE --- M6["📐 Calibraciones"]
+  CORE --- M7["📄 Documentos"]
+  CORE --- M8["📚 Normas / Estándares"]
+  CORE --- M9["🔔 Alertas"]
+  CORE --- M10["📊 Reportes & BI"]
+  CORE --- M11["👤 Usuarios"]
+  CORE --- M12["🔐 Roles & Permisos"]
+  CORE --- M13["🔎 Búsqueda global"]
+
+  classDef c fill:#1971f5,stroke:#0b2b6b,color:#fff,font-weight:bold;
+  classDef m fill:#f8fafc,stroke:#cbd5e1,color:#0f172a;
+  class CORE c;
+  class M1,M2,M3,M4,M5,M6,M7,M8,M9,M10,M11,M12,M13 m;
+      </pre>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 3 · MODELO DE DATOS ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Datos</span>
+    <h2>Modelo de datos</h2>
+    <p class="subtitle">Estructura relacional real de la plataforma: cada equipo, caso y evidencia queda conectado y trazable.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">3</span> Diagrama entidad-relación (simplificado)</div>
+      <pre class="mermaid">
+erDiagram
+  CLINICS ||--o{ LOCATIONS : "tiene sedes"
+  CLINICS ||--o{ SECTORS : "tiene unidades"
+  CLINICS ||--o{ USERS : "emplea"
+  CLINICS ||--o{ EQUIPMENT : "posee"
+  CLINICS ||--o{ CLINIC_FEATURES : "habilita módulos"
+  SECTORS ||--o{ EQUIPMENT : "ubica"
+  SECTORS }o--|| USERS : "ingeniero por defecto"
+  EQUIPMENT ||--o{ CASES : "genera"
+  EQUIPMENT ||--o{ DOCUMENTS : "adjunta"
+  EQUIPMENT ||--o{ ALERTS : "dispara"
+  EQUIPMENT ||--o{ MAINTENANCE_SCHEDULES : "programa"
+  EQUIPMENT ||--o{ CALIBRATIONS : "registra"
+  USERS ||--o{ CASES : "reporta / atiende"
+  CASES ||--o{ CASE_ACTIVITIES : "bitácora"
+  CASES ||--o{ DOCUMENTS : "evidencia"
+  ROLE_PERMISSIONS }o--|| USERS : "gobierna por rol"
+
+  CLINICS {
+    uuid id
+    string name
+    string tax_id "NIT"
+    string email_phone
+  }
+  EQUIPMENT {
+    string code "URL bonita"
+    string qr_token "único"
+    string name_brand_model
+    enum risk_class "I / IIa / IIb / III"
+    enum status
+  }
+  CASES {
+    string code
+    enum type "correctivo/preventivo/..."
+    enum status
+    enum priority
+    datetime tiempos "asignado→cierre"
+    string firma_receptor
+  }
+  USERS {
+    string full_name
+    enum role
+    uuid clinic_id
+  }
+      </pre>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 4 · CICLO DE VIDA DEL CASO ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Flujo clave</span>
+    <h2>Ciclo de vida de un caso de servicio</h2>
+    <p class="subtitle">Cada intervención queda registrada con sus tiempos y evidencia — la columna vertebral del cumplimiento.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">4</span> Estados del caso y captura de tiempos</div>
+      <pre class="mermaid">
+stateDiagram-v2
+  [*] --> open: Reportado (QR o web)
+  open --> assigned: Asignar ingeniero ⏱ assigned_at
+  assigned --> in_progress: Aceptar + iniciar ⏱ accepted_at / work_started_at
+  in_progress --> waiting_parts: Falta repuesto
+  in_progress --> waiting_client: Espera del cliente
+  waiting_parts --> in_progress: Repuesto disponible
+  waiting_client --> in_progress: Cliente responde
+  in_progress --> closed: Cerrar con evidencia ⏱ finished_at / closed_at
+  open --> cancelled: Anular
+  assigned --> cancelled: Anular
+  closed --> [*]
+  cancelled --> [*]
+
+  note right of closed
+    Cierre = trabajo realizado + minutos
+    de operación + repuestos + fotos +
+    firma del receptor + PDF del reporte
+  end note
+      </pre>
+    </div>
+
+    <div class="callout">
+      <strong>Valor diferencial:</strong> Bamesoft no solo cambia un estado — captura la <strong>fecha/hora exacta</strong> de cada paso (reporte, asignación, aceptación, inicio, fin y cierre). Eso permite medir tiempos reales de respuesta y de reparación por ingeniero y por equipo, y demostrar cumplimiento de SLA ante una auditoría.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 5 · FLUJO QR ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Experiencia móvil</span>
+    <h2>Del QR al reporte, en segundos</h2>
+    <p class="subtitle">Cualquier miembro del personal escanea el equipo y reporta una falla — de forma segura, siempre autenticado.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">5</span> Flujo de escaneo QR → ficha móvil → reporte</div>
+      <pre class="mermaid">
+sequenceDiagram
+  autonumber
+  actor U as Personal clínico
+  participant Q as Sticker QR del equipo
+  participant W as Ficha móvil /e/:code
+  participant A as Supabase Auth
+  participant API as Backend (scoped)
+
+  U->>Q: Escanea el QR
+  Q->>W: Abre la ficha del equipo
+  W->>A: ¿Hay sesión activa?
+  alt Sin sesión
+    W-->>U: Redirige a Login (?next = ficha)
+    U->>A: Inicia sesión
+    A-->>W: JWT válido → regresa a la ficha
+  end
+  W->>API: Solicita equipo (filtrado por su clínica)
+  API-->>W: Datos + historial de casos
+  U->>W: Toca “Reportar un caso”
+  W->>API: Crea el caso
+  API-->>U: ✓ Caso registrado y en cola
+      </pre>
+    </div>
+
+    <div class="callout">
+      <strong>Seguridad por diseño:</strong> el QR <strong>nunca</strong> expone datos sin sesión. Si no hay login, redirige y regresa automáticamente a la ficha tras autenticarse. Un usuario solo ve equipos de <strong>su</strong> clínica.
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 6 · MULTI-TENANT ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Seguridad</span>
+    <h2>Aislamiento multi-tenant</h2>
+    <p class="subtitle">Varias clínicas en la misma plataforma, con separación total de datos.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">6</span> Cómo se aíslan los datos entre clínicas</div>
+      <pre class="mermaid">
+flowchart TB
+  R["Petición + JWT del usuario"] --> D{"clinic_scope(usuario)"}
+  D -->|"rol = admin (super)"| ALL["Ve y gestiona TODAS las clínicas"]
+  D -->|"clinic_admin / ingeniero / operario…"| ONE["Filtra SIEMPRE por su clinic_id"]
+  ALL --> DB[("PostgreSQL")]
+  ONE --> DB
+  ONE -.->|"intenta ver otra clínica"| X["⛔ 0 resultados / 403"]
+
+  classDef ok fill:#f0fdf4,stroke:#34d399,color:#065f46;
+  classDef warn fill:#fef2f2,stroke:#ef4444,color:#991b1b;
+  class ALL,ONE ok; class X warn;
+      </pre>
+    </div>
+    <p>El aislamiento se aplica en la <strong>capa de servicio del backend</strong>: cada consulta que expone datos recibe el <em>scope</em> de la clínica del usuario. Un administrador de una clínica jamás verá información de otra; solo el super administrador tiene visión global.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 7 · CONTROL DE ACCESO ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Gobierno</span>
+    <h2>Roles y Permisos configurables</h2>
+    <p class="subtitle">Dos matrices independientes, editables desde la app y persistidas en base de datos.</p>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">7</span> Doble control: qué puede HACER cada rol y qué puede VER cada compañía</div>
+      <pre class="mermaid">
+flowchart LR
+  subgraph ROLES["🔑 ROLES · qué puede HACER cada rol"]
+    RR["admin · clinic_admin · engineer · service · support · client"]
+    CAP["reportar · trabajar · cerrar · equipos · unidades · docs · reportes · usuarios · compañías · accesos"]
+    RR --> CAP
+  end
+  subgraph FEATS["🧩 PERMISOS · qué módulos VE cada compañía"]
+    CL["Cada clínica"]
+    FE["dashboard · equipos · unidades · casos · alertas · documentos · normas · reportes"]
+    CL --> FE
+  end
+  ROLES --> UI{{"La opción se muestra SÓLO si:<br/>el rol tiene la capacidad<br/>Y la compañía tiene el módulo"}}
+  FEATS --> UI
+
+  classDef a fill:#eff6ff,stroke:#1971f5,color:#0f172a;
+  classDef b fill:#ecfeff,stroke:#06b6d4,color:#0f172a;
+  class RR,CAP a; class CL,FE b;
+      </pre>
+    </div>
+    <p>El super administrador ajusta ambas matrices sin tocar código. El backend mantiene además un candado duro: las acciones sensibles (cerrar/editar un caso, gestionar usuarios) exigen el rol adecuado aunque la interfaz cambie.</p>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ DIAGRAMA 8 · JOURNEY ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Extremo a extremo</span>
+    <h2>El flujo completo, de principio a fin</h2>
+
+    <div class="diagram">
+      <div class="cap"><span class="num">8</span> Recorrido de un equipo y su servicio</div>
+      <pre class="mermaid">
+flowchart LR
+  A["1· Alta de equipo<br/>en inventario + QR"] --> B["2· Instalación<br/>en su unidad"]
+  B --> C["3· Falla o<br/>mantenimiento"]
+  C --> D["4· Reporte<br/>(QR / web)"]
+  D --> E["5· Asignación<br/>al ingeniero"]
+  E --> F["6· Servicio<br/>en sitio"]
+  F --> G["7· Cierre + fotos<br/>+ firma + PDF"]
+  G --> H["8· Indicadores<br/>& hoja de vida"]
+  H -.->|"histórico"| C
+
+  classDef s fill:#f8fafc,stroke:#1971f5,color:#0f172a;
+  class A,B,C,D,E,F,G,H s;
+      </pre>
+    </div>
+
+    <div class="grid three">
+      <div class="box"><div class="t">Hoja de vida</div><div class="d">Cada equipo acumula su historial completo de intervenciones, exportable a PDF.</div></div>
+      <div class="box"><div class="t">Evidencia digital</div><div class="d">Fotos antes/después, firma del receptor y reporte en PDF sin cortes.</div></div>
+      <div class="box"><div class="t">Indicadores</div><div class="d">Tiempos, cargas por ingeniero, estados por unidad y tipo de caso.</div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ SEGURIDAD ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Confianza</span>
+    <h2>Seguridad y cumplimiento</h2>
+    <div class="grid">
+      <div class="box"><div class="t">🔐 Autenticación robusta</div><div class="d">Sesiones con JWT vía Supabase Auth. Las contraseñas nunca se almacenan en la aplicación.</div></div>
+      <div class="box"><div class="t">🏥 Aislamiento por clínica</div><div class="d">Separación total de datos entre compañías, forzada en el backend en cada consulta.</div></div>
+      <div class="box"><div class="t">🧾 Trazabilidad auditable</div><div class="d">Bitácora de actividades por caso, tiempos sellados y evidencia firmada.</div></div>
+      <div class="box"><div class="t">📱 QR seguro</div><div class="d">El escaneo siempre exige sesión; no hay endpoints públicos que filtren datos.</div></div>
+    </div>
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- ============ PLANES ============ -->
+  <div class="pad page-break">
+    <span class="kicker">Inversión</span>
+    <h2>Planes y modelo de servicio</h2>
+    <p class="subtitle">Suscripción mensual + una implementación inicial única. Actualizaciones incluidas.</p>
+
+    <table>
+      <thead>
+        <tr><th>Plan</th><th>Para quién</th><th>Mensual</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>Básico</strong></td><td>1 sede · hasta ~50 equipos</td><td class="price">desde $850.000</td></tr>
+        <tr class="highlight-row"><td><strong>Pro</strong></td><td>Varias sedes · ~200 equipos · Reportes &amp; BI</td><td class="price">desde $1.500.000</td></tr>
+        <tr><td><strong>Hospital</strong></td><td>Multi-sede · equipos ilimitados · soporte prioritario</td><td class="price">desde $2.800.000</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Implementación inicial · desde $1.800.000 (pago único)</h3>
+    <p>Puesta en marcha completa a cargo de nuestro equipo: <strong>carga y subida de la información</strong> (inventario de equipos, historial), creación de usuarios/roles/unidades de servicio, configuración de la compañía (logo, NIT, cronogramas de mantenimiento) y <strong>capacitación del personal</strong>. El valor final se ajusta según el número de sedes y equipos a cargar.</p>
+
+    <div class="callout">
+      <strong>Actualizaciones y soporte incluidos:</strong> la suscripción cubre nuevas funciones, mejoras de seguridad y soporte — sin costos ocultos.
+    </div>
+
+    <p style="font-size:12.5px;color:var(--muted);margin-top:24px;">* Valores de referencia en pesos colombianos (COP), ajustables según alcance, número de sedes y equipos. La propuesta económica formal se entrega en documento aparte.</p>
+  </div>
+
+  <footer class="doc">
+    Bamesoft · Plataforma de gestión de equipos biomédicos · Documento técnico-comercial<br/>
+    Confidencial — para uso del cliente evaluador.
+  </footer>
+
+</div>
+
+<script type="module">
+  import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'base',
+    securityLevel: 'loose',
+    themeVariables: {
+      fontFamily: 'Inter, system-ui, sans-serif',
+      primaryColor: '#eff6ff',
+      primaryTextColor: '#0f172a',
+      primaryBorderColor: '#1971f5',
+      lineColor: '#0891b2',
+      secondaryColor: '#ecfeff',
+      tertiaryColor: '#f0fdf4',
+      noteBkgColor: '#fefce8',
+      noteBorderColor: '#eab308'
+    },
+    flowchart: { curve: 'basis', padding: 12 },
+    er: { layoutDirection: 'TB', useMaxWidth: true }
+  });
+</script>
+
+</body>
+</html>
