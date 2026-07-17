@@ -8,6 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1.router import api_router
+from app.core.audit_middleware import AuditMiddleware
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import dispose_engine
@@ -40,6 +41,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+
+    # Bitácora de auditoría (registra mutaciones exitosas con su actor).
+    app.add_middleware(AuditMiddleware)
 
     app.include_router(api_router, prefix="/api/v1")
 

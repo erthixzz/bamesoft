@@ -47,5 +47,6 @@ class UserOut(UserBase):
     avatar_url: str | None = None
     active: bool
     clinic_name: str | None = None
+    last_seen_at: datetime | None = None
     created_at: datetime
     updated_at: datetime

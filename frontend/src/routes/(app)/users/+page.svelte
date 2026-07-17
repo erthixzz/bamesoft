@@ -20,6 +20,7 @@
   import { ROLE_LABELS, CAPABILITIES, ALL_ROLES, permissions, hasCapIn } from '$lib/utils/permissions';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
+  import { timeFromNow, formatDateTime } from '$lib/utils/format';
   import type { UserRole } from '$lib/api/types';
   import { Users, Copy, UserX, Pencil, Check, ShieldCheck, PlusCircle, Search } from 'lucide-svelte';
 
@@ -50,6 +51,7 @@
     { key: 'email', label: 'Email' },
     { key: 'clinic_id', label: 'Compañía' },
     { key: 'role', label: 'Rol' },
+    { key: 'last_seen_at', label: 'Última conexión' },
     { key: 'active', label: 'Estado' },
   ];
 
@@ -144,6 +146,16 @@
           {row.clinic_id ? (clinicName[row.clinic_id] ?? '—') : '—'}
         {:else if column === 'role'}
           <Badge tone="blue">{roleLabel(row.role)}</Badge>
+        {:else if column === 'last_seen_at'}
+          {#if row.last_seen_at}
+            {@const online = Date.now() - new Date(row.last_seen_at).getTime() < 5 * 60000}
+            <span class="inline-flex items-center gap-1.5 text-sm text-slate-600" title={formatDateTime(row.last_seen_at)}>
+              <span class="h-1.5 w-1.5 rounded-full {online ? 'bg-emerald-500 shadow-[0_0_6px_1px_rgba(16,185,129,0.6)]' : 'bg-slate-300'}"></span>
+              {online ? 'En línea' : timeFromNow(row.last_seen_at)}
+            </span>
+          {:else}
+            <span class="value-pending">Nunca</span>
+          {/if}
         {:else if column === 'active'}
           <Badge tone={row.active ? 'green' : 'gray'}>{row.active ? 'Activo' : 'Inactivo'}</Badge>
         {:else}

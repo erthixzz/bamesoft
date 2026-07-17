@@ -50,6 +50,7 @@ export type Capability =
   | 'users'
   | 'clinics'
   | 'access'
+  | 'audit'
   | 'dashboard';
 
 export interface CapabilityDef {
@@ -70,6 +71,7 @@ export const CAPABILITIES: CapabilityDef[] = [
   { key: 'users', label: 'Gestionar usuarios' },
   { key: 'clinics', label: 'Gestionar compañías' },
   { key: 'access', label: 'Gestionar roles y permisos' },
+  { key: 'audit', label: 'Ver bitácora / logs' },
 ];
 
 // ---- Módulos que una compañía puede ver (features) -------------------------
@@ -93,8 +95,8 @@ export type PermMatrix = Record<string, Record<string, boolean>>; // rol -> cap 
 
 // Defaults (deben reflejar el seed del backend); se usan antes de cargar de BD.
 const DEFAULTS: Record<UserRole, Capability[]> = {
-  admin: ['report', 'work', 'close', 'equipment', 'sectors', 'docs', 'standards', 'reports', 'users', 'clinics', 'access', 'dashboard'],
-  clinic_admin: ['report', 'work', 'close', 'equipment', 'sectors', 'docs', 'standards', 'reports', 'users', 'dashboard'],
+  admin: ['report', 'work', 'close', 'equipment', 'sectors', 'docs', 'standards', 'reports', 'users', 'clinics', 'access', 'audit', 'dashboard'],
+  clinic_admin: ['report', 'work', 'close', 'equipment', 'sectors', 'docs', 'standards', 'reports', 'users', 'audit', 'dashboard'],
   engineer: ['report', 'work', 'close', 'equipment', 'sectors', 'docs', 'standards', 'reports', 'dashboard'],
   support: ['report', 'docs', 'reports', 'dashboard'],
   service: ['report', 'docs'],
@@ -143,4 +145,5 @@ export const can = {
   manageUsers: (r: UserRole | null | undefined) => hasCap(r, 'users'),
   manageClinics: (r: UserRole | null | undefined) => hasCap(r, 'clinics'),
   manageAccess: (r: UserRole | null | undefined) => hasCap(r, 'access'),
+  viewAudit: (r: UserRole | null | undefined) => hasCap(r, 'audit'),
 };

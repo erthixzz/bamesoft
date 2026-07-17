@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import UTC, datetime, timedelta
 
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -44,6 +45,12 @@ async def _user_from_token(authorization: str | None, db: AsyncSession) -> User:
 
     if not user.active:
         raise Forbidden("Usuario desactivado")
+
+    # Marca de "última conexión" (throttled: como máximo un write cada 2 min por
+    # usuario, para no escribir en cada request).
+    now = datetime.now(UTC)
+    if user.last_seen_at is None or (now - user.last_seen_at) > timedelta(minutes=2):
+        user.last_seen_at = now
 
     return user
 

@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from app.modules.access.routes import router as access_router
 from app.modules.alerts.routes import router as alerts_router
+from app.modules.audit.routes import router as audit_router
 from app.modules.auth.routes import router as auth_router
 from app.modules.calibrations.routes import router as calibrations_router
 from app.modules.cases.routes import router as cases_router
@@ -33,5 +34,6 @@ api_router.include_router(alerts_router)
 api_router.include_router(sectors_router)
 api_router.include_router(reports_router)
 api_router.include_router(access_router)
+api_router.include_router(audit_router)
 api_router.include_router(search_router)
 api_router.include_router(public_router)

@@ -130,6 +130,22 @@ async def update_case(
         obj.closed_at = now
         if obj.finished_at is None:
             obj.finished_at = now
+    # Reapertura: si el caso deja de estar CERRADO y vuelve a un estado activo,
+    # se limpia el cierre (fecha de cierre, fin de trabajo y resultado) para que
+    # TODAS las estadísticas reflejen el estado actual y no datos "sellados"
+    # de un cierre previo (p. ej. un caso en progreso no debe contar como
+    # completo ni sumar al tiempo promedio de cierre).
+    _ACTIVE_AGAIN = {
+        CaseStatus.OPEN,
+        CaseStatus.ASSIGNED,
+        CaseStatus.IN_PROGRESS,
+        CaseStatus.WAITING_PARTS,
+        CaseStatus.WAITING_CLIENT,
+    }
+    if obj.status == CaseStatus.CLOSED and new_status in _ACTIVE_AGAIN:
+        obj.closed_at = None
+        obj.finished_at = None
+        obj.completion = None
     if new_status == CaseStatus.IN_PROGRESS and obj.work_started_at is None:
         obj.work_started_at = now
     if data.get("assigned_to") and obj.status == CaseStatus.OPEN:

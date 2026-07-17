@@ -41,6 +41,7 @@
     { prefix: '/users', cap: 'users' },
     { prefix: '/roles', cap: 'access' },
     { prefix: '/permissions', cap: 'access' },
+    { prefix: '/logs', cap: 'audit' },
   ];
 
   $: rule = ROUTE_RULES.find((r) => $page.url.pathname.startsWith(r.prefix));

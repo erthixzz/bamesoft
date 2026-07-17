@@ -10,6 +10,8 @@ export interface User {
   avatar_url?: string | null;
   active: boolean;
   clinic_id?: string | null;
+  clinic_name?: string | null;
+  last_seen_at?: string | null;
   created_at: string;
   updated_at: string;
 }

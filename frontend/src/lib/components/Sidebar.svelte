@@ -28,6 +28,7 @@
     Building2,
     ShieldCheck,
     KeyRound,
+    ScrollText,
     X,
   } from 'lucide-svelte';
 
@@ -51,6 +52,7 @@
     { href: '/users', label: 'Usuarios', icon: Users, cap: 'users' },
     { href: '/roles', label: 'Roles', icon: ShieldCheck, cap: 'access' },
     { href: '/permissions', label: 'Permisos', icon: KeyRound, cap: 'access' },
+    { href: '/logs', label: 'Bitácora', icon: ScrollText, cap: 'audit' },
     { href: '/settings', label: 'Ajustes', icon: Settings },
   ];
 
@@ -138,7 +140,7 @@
       </button>
     </div>
     <nav class="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-      {#each items as item}
+      {#each visibleItems as item}
         {@const active = current === item.href || current.startsWith(item.href + '/')}
         <a
           href={item.href}
