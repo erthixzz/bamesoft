@@ -187,8 +187,13 @@ async def productivity(
     def avg_secs(a, b):
         return func.avg(func.extract("epoch", b - a))
 
-    completed = func.count().filter(Case.completion == CaseCompletion.COMPLETE)
-    incomplete = func.count().filter(Case.completion == CaseCompletion.INCOMPLETE)
+    # Completo/Incompleto solo cuenta en casos ya cerrados (servicio terminado).
+    completed = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
+    )
+    incomplete = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.INCOMPLETE)
+    )
     closed = func.count().filter(Case.status == CaseStatus.CLOSED)
     fcr = func.count().filter(
         (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
@@ -265,8 +270,21 @@ async def operations(
                 select(
                     func.count().label("reported"),
                     func.count().filter(Case.status == CaseStatus.CLOSED).label("closed"),
-                    func.count().filter(Case.completion == CaseCompletion.COMPLETE).label("complete"),
-                    func.count().filter(Case.completion == CaseCompletion.INCOMPLETE).label("incomplete"),
+                    # "Completas/Incompletas" solo tienen sentido en casos CERRADOS
+                    # (el servicio ya terminó). Un caso en progreso nunca cuenta,
+                    # aunque tenga `completion` de una edición previa.
+                    func.count()
+                    .filter(
+                        (Case.status == CaseStatus.CLOSED)
+                        & (Case.completion == CaseCompletion.COMPLETE)
+                    )
+                    .label("complete"),
+                    func.count()
+                    .filter(
+                        (Case.status == CaseStatus.CLOSED)
+                        & (Case.completion == CaseCompletion.INCOMPLETE)
+                    )
+                    .label("incomplete"),
                 ).where(*rng),
                 scope,
             )
@@ -353,8 +371,13 @@ async def equipment_report(
     completos/incompletos, tipo de trabajo y cuánto se demoró en promedio."""
     rng = _range_filters(date_from, date_to)
 
-    completed = func.count().filter(Case.completion == CaseCompletion.COMPLETE)
-    incomplete = func.count().filter(Case.completion == CaseCompletion.INCOMPLETE)
+    # Completo/Incompleto solo cuenta en casos ya cerrados (servicio terminado).
+    completed = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
+    )
+    incomplete = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.INCOMPLETE)
+    )
     corrective = func.count().filter(Case.type == CaseType.CORRECTIVE)
     preventive = func.count().filter(Case.type == CaseType.PREVENTIVE)
 

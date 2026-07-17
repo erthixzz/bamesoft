@@ -40,6 +40,7 @@
     PieChart,
     Building2,
     CalendarRange,
+    Info,
   } from 'lucide-svelte';
 
   let compliance: ComplianceReport | null = null;
@@ -162,14 +163,50 @@
     tab = 'servicios';
   }
 
+  // Índice de la tarjeta cuyo tooltip está abierto (clic para explicar el KPI).
+  let openHint: number | null = null;
+  function toggleHint(i: number) {
+    openHint = openHint === i ? null : i;
+  }
+
   $: kpis = ops
     ? [
-        { label: 'Reportadas', value: ops.reported_total, tone: 'text-brand-700' },
-        { label: 'Cerradas', value: ops.closed_total, tone: 'text-emerald-700' },
-        { label: 'Completas', value: ops.complete_total, tone: 'text-emerald-700' },
-        { label: 'Incompletas', value: ops.incomplete_total, tone: 'text-amber-700' },
-        { label: 'En espera', value: ops.waiting_now, tone: 'text-orange-700' },
-        { label: 'FCR', value: prod ? `${prod.fcr_pct}%` : '—', tone: 'text-brand-700' },
+        {
+          label: 'Reportadas',
+          value: ops.reported_total,
+          tone: 'text-brand-700',
+          hint: 'Total de casos reportados (creados) dentro del rango de fechas seleccionado.',
+        },
+        {
+          label: 'Cerradas',
+          value: ops.closed_total,
+          tone: 'text-emerald-700',
+          hint: 'Casos cuyo servicio ya finalizó y se cerraron dentro del rango.',
+        },
+        {
+          label: 'Completas',
+          value: ops.complete_total,
+          tone: 'text-emerald-700',
+          hint: 'Casos CERRADOS cuyo servicio quedó completo: el equipo quedó funcionando/OK. Nunca supera a “Cerradas”.',
+        },
+        {
+          label: 'Incompletas',
+          value: ops.incomplete_total,
+          tone: 'text-amber-700',
+          hint: 'Casos CERRADOS que quedaron incompletos (p. ej. faltó un repuesto y algo quedó pendiente).',
+        },
+        {
+          label: 'En espera',
+          value: ops.waiting_now,
+          tone: 'text-orange-700',
+          hint: 'Casos detenidos ahora mismo esperando repuestos o respuesta del cliente.',
+        },
+        {
+          label: 'FCR',
+          value: prod ? `${prod.fcr_pct}%` : '—',
+          tone: 'text-brand-700',
+          hint: 'FCR (First Call Resolution): % de casos resueltos completos “a la primera” — cerrados y completos ÷ total atendidos. Mientras más alto, mejor.',
+        },
       ]
     : [];
 </script>
@@ -205,13 +242,44 @@
   <!-- ══ RESUMEN ══ -->
   <div class="animate-fade-up">
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      {#each kpis as k}
+      {#each kpis as k, i}
         <Card>
-          <p class="text-xs font-medium uppercase tracking-wide text-slate-400">{k.label}</p>
-          <p class="mt-1 text-2xl font-bold tabular-nums {k.tone}">{k.value}</p>
+          <div class="relative">
+            <div class="flex items-start justify-between gap-1">
+              <p class="text-xs font-medium uppercase tracking-wide text-slate-400">{k.label}</p>
+              <button
+                type="button"
+                class="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-brand-600 {openHint === i ? 'bg-brand-50 text-brand-600' : ''}"
+                on:click={() => toggleHint(i)}
+                aria-label="Qué significa {k.label}"
+                title="¿Qué significa?"
+              >
+                <Info class="h-3.5 w-3.5" />
+              </button>
+            </div>
+            <p class="mt-1 text-2xl font-bold tabular-nums {k.tone}">{k.value}</p>
+
+            {#if openHint === i}
+              <div
+                class="animate-fade-up absolute left-0 right-0 top-full z-30 mt-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg shadow-slate-900/10"
+                role="tooltip"
+              >
+                {k.hint}
+              </div>
+            {/if}
+          </div>
         </Card>
       {/each}
     </div>
+    {#if openHint !== null}
+      <!-- Capa para cerrar el tooltip al tocar fuera -->
+      <button
+        type="button"
+        class="fixed inset-0 z-20 cursor-default"
+        aria-label="Cerrar explicación"
+        on:click={() => (openHint = null)}
+      ></button>
+    {/if}
 
     <div class="mt-4 grid gap-4 lg:grid-cols-2">
       <Card title="Llamadas por día" description="Casos reportados (azul) vs. cerrados (verde)." icon={PhoneCall} accent="cyan">

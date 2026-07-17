@@ -15,16 +15,23 @@
   import { sectorsApi } from '$lib/modules/sectors/api';
   import type { Equipment } from '$lib/modules/equipment/types';
   import type { Case } from '$lib/modules/cases/types';
-  import { STATUS_META, TYPE_LABEL, isActive } from '$lib/modules/cases/ui';
+  import type { CaseType } from '$lib/api/types';
+  import { STATUS_META, TYPE_LABEL, TYPE_OPTIONS, isActive } from '$lib/modules/cases/ui';
   import { formatDate } from '$lib/utils/format';
   import { get } from 'svelte/store';
   import { role, profile } from '$lib/stores/auth';
   import { authApi } from '$lib/modules/auth/api';
   import { accessApi } from '$lib/modules/access/api';
+  import { documentsApi } from '$lib/modules/documents/api';
   import { can, setPermissions } from '$lib/utils/permissions';
+  import Modal from '$lib/components/Modal.svelte';
+  import Input from '$lib/components/Input.svelte';
+  import Textarea from '$lib/components/Textarea.svelte';
+  import Select from '$lib/components/Select.svelte';
+  import Button from '$lib/components/Button.svelte';
   import {
     Wrench, ArrowRight, Building2, Hash, Cpu, ShieldCheck, Activity,
-    CalendarClock, AlertTriangle, ExternalLink,
+    AlertTriangle, ExternalLink, CheckCircle2, ImagePlus, Send, X,
   } from 'lucide-svelte';
 
   let code = '';
@@ -43,14 +50,91 @@
   };
   $: eqStatus = eq ? (EQ_STATUS[eq.status] ?? { label: eq.status, cls: 'bg-slate-100 text-slate-600 ring-slate-300', dot: 'bg-slate-400' }) : null;
   $: openCases = cases.filter(isActive).length;
-  $: newCaseHref = eq ? `/cases/new?equipment_id=${eq.id}` : '/cases/new';
+
+  // --- Reporte simplificado (solo lo esencial para quien escanea) ---
+  let reportOpen = false;
+  let submitting = false;
+  let submitted = false;
+  let submittedCode = '';
+  let formErr = '';
+  let rTitle = '';
+  let rDesc = '';
+  let rType: CaseType = 'corrective';
+  let photoFile: File | null = null;
+  let photoPreview: string | null = null;
+  let fileInput: HTMLInputElement;
+
+  function openReport() {
+    submitted = false;
+    formErr = '';
+    rTitle = '';
+    rDesc = '';
+    rType = 'corrective';
+    clearPhoto();
+    reportOpen = true;
+  }
+
+  function clearPhoto() {
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    photoFile = null;
+    photoPreview = null;
+  }
+
+  function onPhoto(e: Event) {
+    const f = (e.target as HTMLInputElement).files?.[0] ?? null;
+    if (photoPreview) URL.revokeObjectURL(photoPreview);
+    photoFile = f;
+    photoPreview = f ? URL.createObjectURL(f) : null;
+  }
+
+  async function submitReport() {
+    formErr = '';
+    if (!rTitle.trim()) {
+      formErr = 'Escribe un título breve del problema.';
+      return;
+    }
+    if (!eq) return;
+    submitting = true;
+    try {
+      const c = await casesApi.create({
+        title: rTitle.trim(),
+        description: rDesc.trim() || undefined,
+        type: rType,
+        equipment_id: eq.id,
+      });
+      if (photoFile) {
+        // La foto es opcional: si falla, el caso ya quedó registrado.
+        try {
+          await documentsApi.upload(photoFile, {
+            title: `Foto · ${c.code}`,
+            type: 'photo',
+            case_id: c.id,
+            equipment_id: eq.id,
+          });
+        } catch {
+          /* ignore */
+        }
+      }
+      submittedCode = c.code;
+      submitted = true;
+      // Refresca el contador/lista para que se vea el caso recién creado.
+      cases = await casesApi.list({ equipment_id: eq.id, limit: 8 }).catch(() => cases);
+    } catch (e) {
+      formErr = e instanceof Error ? e.message : 'No se pudo enviar el caso. Intenta de nuevo.';
+    } finally {
+      submitting = false;
+    }
+  }
 
   onMount(async () => {
     code = $page.params.code ?? '';
+    // El QR SIEMPRE exige iniciar sesión. Solo continuamos si venimos de un
+    // login recién verificado (?v=1) Y hay sesión; de lo contrario mandamos al
+    // login. Cada escaneo abre la URL sin ?v=1 → fuerza el login otra vez.
+    const verified = $page.url.searchParams.get('v') === '1';
     const { data } = await supabase.auth.getSession();
-    if (!data.session) {
-      const here = $page.url.pathname + $page.url.search;
-      goto(`/login?next=${encodeURIComponent(here)}`, { replaceState: true });
+    if (!data.session || !verified) {
+      goto(`/login?next=${encodeURIComponent(`/e/${code}?v=1`)}`, { replaceState: true });
       return;
     }
     authed = true;
@@ -145,11 +229,12 @@
         </div>
       </section>
 
-      <!-- CTA reportar: grande, con marca y animado -->
+      <!-- CTA reportar: grande, con marca y animado (único botón) -->
       {#if authed}
-        <a
-          href={newCaseHref}
-          class="animate-float group relative mt-5 flex items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-cyan-500 to-brand-600 px-5 py-4 text-white shadow-xl shadow-brand-600/30 transition active:scale-[0.98] animate-gradient"
+        <button
+          type="button"
+          on:click={openReport}
+          class="animate-float group relative mt-5 flex w-full items-center gap-3 overflow-hidden rounded-2xl bg-gradient-to-r from-brand-600 via-cyan-500 to-brand-600 px-5 py-4 text-left text-white shadow-xl shadow-brand-600/30 transition active:scale-[0.98] animate-gradient"
           aria-label="Reportar un caso para este equipo"
         >
           <!-- brillo que se desliza en bucle -->
@@ -164,7 +249,7 @@
           <span class="relative ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white/20 transition group-hover:translate-x-0.5 group-hover:bg-white/30">
             <ArrowRight class="h-5 w-5" />
           </span>
-        </a>
+        </button>
       {/if}
 
       <!-- Stat rápida -->
@@ -219,16 +304,94 @@
       <p class="mt-8 text-center text-xs text-slate-400">Información protegida · <span class="font-semibold text-slate-500">Bamesoft Solutions</span></p>
     {/if}
   </main>
+</div>
 
-  <!-- CTA fija inferior (móvil): siempre a mano para reportar -->
-  {#if eq && authed}
-    <div class="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white/90 p-3 backdrop-blur-xl sm:hidden">
-      <a
-        href={newCaseHref}
-        class="flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-cyan-500 px-6 py-3.5 text-base font-bold text-white shadow-lg active:scale-[0.98]"
-      >
-        <Wrench class="h-5 w-5" /> Reportar caso
-      </a>
+<!-- Modal de reporte simplificado: solo título, descripción, tipo y foto -->
+<Modal bind:open={reportOpen} title="Reportar un caso" size="md">
+  {#if submitted}
+    <!-- Confirmación -->
+    <div class="py-4 text-center">
+      <div class="mx-auto mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-emerald-50 text-emerald-600">
+        <CheckCircle2 class="h-9 w-9" />
+      </div>
+      <h3 class="text-lg font-bold text-slate-900">¡Caso reportado!</h3>
+      <p class="mx-auto mt-2 max-w-xs text-sm text-slate-600">
+        Tu reporte <span class="font-semibold text-slate-800">{submittedCode}</span> quedó registrado.
+        El equipo de ingeniería lo revisará y asignará. Gracias.
+      </p>
+    </div>
+  {:else}
+    <div class="space-y-4">
+      <div class="rounded-xl bg-slate-50 px-3.5 py-2.5 text-sm">
+        <span class="text-slate-500">Equipo:</span>
+        <span class="font-semibold text-slate-800">{eq?.code} · {eq?.name}</span>
+      </div>
+
+      <Input label="Título *" bind:value={rTitle} placeholder="Ej.: No enciende / hace ruido" required />
+      <Textarea label="Descripción" bind:value={rDesc} rows={4} placeholder="Cuéntanos qué está pasando…" />
+      <Select label="Tipo" bind:value={rType} options={TYPE_OPTIONS} />
+
+      <!-- Foto opcional (abre cámara en móvil) -->
+      <div>
+        <span class="mb-1.5 block text-sm font-medium text-slate-700">Foto (opcional)</span>
+        <input
+          bind:this={fileInput}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          class="hidden"
+          on:change={onPhoto}
+        />
+        {#if photoPreview}
+          <div class="relative overflow-hidden rounded-xl border border-slate-200">
+            <img src={photoPreview} alt="Vista previa" class="max-h-52 w-full object-cover" />
+            <button
+              type="button"
+              on:click={clearPhoto}
+              class="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-slate-900/60 text-white backdrop-blur"
+              aria-label="Quitar foto"
+            >
+              <X class="h-4 w-4" />
+            </button>
+          </div>
+        {:else}
+          <button
+            type="button"
+            on:click={() => fileInput?.click()}
+            class="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-slate-300 bg-slate-50 py-4 text-sm font-medium text-slate-500 transition hover:border-brand-300 hover:text-brand-600"
+          >
+            <ImagePlus class="h-5 w-5" /> Agregar una foto
+          </button>
+        {/if}
+      </div>
+
+      {#if formErr}
+        <p class="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{formErr}</p>
+      {/if}
     </div>
   {/if}
-</div>
+
+  <svelte:fragment slot="footer">
+    {#if submitted}
+      <div class="flex gap-2">
+        <button
+          type="button"
+          class="btn-secondary flex-1"
+          on:click={openReport}
+        >
+          Reportar otro
+        </button>
+        <button type="button" class="btn-primary flex-1" on:click={() => (reportOpen = false)}>
+          Listo
+        </button>
+      </div>
+    {:else}
+      <div class="flex items-center justify-end gap-2">
+        <button type="button" class="btn-secondary" on:click={() => (reportOpen = false)}>Cancelar</button>
+        <Button on:click={submitReport} loading={submitting}>
+          <span class="flex items-center gap-2"><Send class="h-4 w-4" /> Enviar caso</span>
+        </Button>
+      </div>
+    {/if}
+  </svelte:fragment>
+</Modal>
