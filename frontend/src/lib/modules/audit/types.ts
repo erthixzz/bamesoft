@@ -5,6 +5,7 @@ export interface AuditLog {
   actor_role?: string | null;
   method: string;
   action: string;
+  detail?: string | null;
   entity?: string | null;
   entity_id?: string | null;
   status_code?: number | null;

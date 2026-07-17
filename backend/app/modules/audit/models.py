@@ -28,6 +28,7 @@ class AuditLog(Base, UUIDPrimaryKey):
 
     method: Mapped[str] = mapped_column(String(8), nullable=False)
     action: Mapped[str] = mapped_column(String(160), nullable=False)
+    detail: Mapped[str | None] = mapped_column(String(600))
     entity: Mapped[str | None] = mapped_column(String(64))
     entity_id: Mapped[str | None] = mapped_column(String(64))
     path: Mapped[str | None] = mapped_column(String(512))

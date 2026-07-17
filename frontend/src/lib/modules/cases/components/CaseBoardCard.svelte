@@ -2,11 +2,13 @@
   import { createEventDispatcher } from 'svelte';
   import { Clock, Cpu, Pencil, ArrowUpRight, AlarmClock, Loader2 } from 'lucide-svelte';
   import Select from '$lib/components/Select.svelte';
+  import DatePicker from '$lib/components/DatePicker.svelte';
   import { casesApi } from '$lib/modules/cases/api';
   import type { Case } from '$lib/modules/cases/types';
   import type { User } from '$lib/modules/users/types';
   import {
     PRIORITY_META,
+    PRIORITY_OPTIONS,
     STATUS_META,
     STATUS_GROUP_OPTIONS,
     statusGroupKey,
@@ -28,12 +30,28 @@
 
   let busy = false;
 
+  const pad2 = (n: number) => String(n).padStart(2, '0');
+  function toLocalInput(iso?: string | null): string {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+  }
+
   // Valores locales de los selects en línea (se resincronizan si cambia `c`).
   // El estado se muestra resumido por grupo (Esp. repuestos/cliente → "En espera").
   let statusVal = statusGroupKey(c.status);
   let assigneeVal = c.assigned_to ?? '';
+  let prioVal = c.priority;
+  let slaVal = toLocalInput(c.sla_due_at);
   $: statusVal = statusGroupKey(c.status);
   $: assigneeVal = c.assigned_to ?? '';
+  $: prioVal = c.priority;
+  $: slaVal = toLocalInput(c.sla_due_at);
+
+  // El SLA es un derecho de gestión (no lo pone el operario): si un caso activo
+  // no lo tiene, se resalta para que un admin/ingeniero lo defina desde aquí.
+  $: needsSla = isActive(c) && !c.sla_due_at;
+  $: needsAssignee = isActive(c) && !c.assigned_to;
 
   $: prio = PRIORITY_META[c.priority];
   $: stat = STATUS_META[c.status];
@@ -51,8 +69,10 @@
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'No se pudo actualizar');
       // revertir selects a lo último conocido
-      statusVal = c.status;
+      statusVal = statusGroupKey(c.status);
       assigneeVal = c.assigned_to ?? '';
+      prioVal = c.priority;
+      slaVal = toLocalInput(c.sla_due_at);
     } finally {
       busy = false;
     }
@@ -64,6 +84,20 @@
   }
   function onAssigneeChange(v: string) {
     if ((v || null) !== (c.assigned_to ?? null)) persist({ assigned_to: (v || null) as never });
+  }
+  function onPriorityChange(v: string) {
+    if (v && v !== c.priority) persist({ priority: v as never });
+  }
+
+  // El DatePicker emite varios 'change' al ajustar la hora → se debouncea.
+  let slaTimer: ReturnType<typeof setTimeout>;
+  function onSlaChange(v: string) {
+    clearTimeout(slaTimer);
+    slaTimer = setTimeout(() => {
+      const iso = v ? new Date(v).toISOString() : null;
+      const cur = c.sla_due_at ? new Date(c.sla_due_at).toISOString() : null;
+      if (iso !== cur) persist({ sla_due_at: iso as never });
+    }, 500);
   }
 </script>
 
@@ -114,21 +148,59 @@
     {/if}
   </div>
 
-  <!-- Controles en línea: estado + asignado -->
-  <div class="grid grid-cols-2 gap-2 pl-1.5">
-    <Select
-      bind:value={statusVal}
-      options={STATUS_GROUP_OPTIONS}
-      disabled={busy}
-      on:change={(e) => onStatusChange(e.detail)}
-    />
-    <Select
-      bind:value={assigneeVal}
-      options={engineerOptions}
-      placeholder="Sin asignar"
-      disabled={busy}
-      on:change={(e) => onAssigneeChange(e.detail)}
-    />
+  <!-- Controles en línea: estado · ingeniero · prioridad · SLA -->
+  <div class="grid grid-cols-2 gap-x-2 gap-y-2 pl-1.5">
+    <div>
+      <p class="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Estado</p>
+      <Select
+        bind:value={statusVal}
+        options={STATUS_GROUP_OPTIONS}
+        disabled={busy}
+        on:change={(e) => onStatusChange(e.detail)}
+      />
+    </div>
+
+    <div>
+      <p class="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide {needsAssignee ? 'text-rose-600' : 'text-slate-400'}">
+        Ingeniero
+        {#if needsAssignee}<span class="animate-blink">•</span>{/if}
+      </p>
+      <div class="relative rounded-lg {needsAssignee ? 'ring-2 ring-rose-300' : ''}">
+        <Select
+          bind:value={assigneeVal}
+          options={engineerOptions}
+          placeholder="Sin asignar"
+          disabled={busy}
+          on:change={(e) => onAssigneeChange(e.detail)}
+        />
+      </div>
+    </div>
+
+    <div>
+      <p class="mb-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">Prioridad</p>
+      <Select
+        bind:value={prioVal}
+        options={PRIORITY_OPTIONS}
+        disabled={busy}
+        on:change={(e) => onPriorityChange(e.detail)}
+      />
+    </div>
+
+    <div>
+      <p class="mb-0.5 flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide {needsSla ? 'text-amber-600' : 'text-slate-400'}">
+        SLA
+        {#if needsSla}<span class="rounded bg-amber-100 px-1 text-[9px] font-bold text-amber-700">falta</span>{/if}
+      </p>
+      <div class="relative rounded-lg {needsSla ? 'ring-2 ring-amber-300' : ''}">
+        <DatePicker
+          mode="datetime"
+          placeholder="Definir SLA"
+          bind:value={slaVal}
+          disabled={busy}
+          on:change={(e) => onSlaChange(e.detail)}
+        />
+      </div>
+    </div>
   </div>
 
   <!-- Pie: edad + SLA + acciones -->

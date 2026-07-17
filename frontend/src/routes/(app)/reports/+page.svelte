@@ -163,11 +163,14 @@
     tab = 'servicios';
   }
 
-  // Índice de la tarjeta cuyo tooltip está abierto (clic para explicar el KPI).
+  // Tooltip del KPI: se ve al pasar el mouse (hover) y se puede "fijar" con clic
+  // (útil en móvil / para dejarlo abierto).
   let openHint: number | null = null;
+  let hoverHint: number | null = null;
   function toggleHint(i: number) {
     openHint = openHint === i ? null : i;
   }
+  $: shownHint = openHint ?? hoverHint;
 
   $: kpis = ops
     ? [
@@ -175,7 +178,19 @@
           label: 'Reportadas',
           value: ops.reported_total,
           tone: 'text-brand-700',
-          hint: 'Total de casos reportados (creados) dentro del rango de fechas seleccionado.',
+          hint: 'Total de casos reportados (creados) en el rango. Se reparten sin perder ninguno entre En proceso + En espera + Cerradas + Anuladas.',
+        },
+        {
+          label: 'En proceso',
+          value: ops.active_total,
+          tone: 'text-sky-700',
+          hint: 'Casos activos que aún se están atendiendo (abiertos, asignados o en trabajo). Todavía no cerrados.',
+        },
+        {
+          label: 'En espera',
+          value: ops.waiting_total,
+          tone: 'text-orange-700',
+          hint: 'Casos detenidos esperando repuestos o respuesta del cliente (dentro del rango).',
         },
         {
           label: 'Cerradas',
@@ -184,22 +199,22 @@
           hint: 'Casos cuyo servicio ya finalizó y se cerraron dentro del rango.',
         },
         {
+          label: 'Anuladas',
+          value: ops.cancelled_total,
+          tone: 'text-slate-500',
+          hint: 'Casos cancelados (no se realizó el servicio) dentro del rango.',
+        },
+        {
           label: 'Completas',
           value: ops.complete_total,
           tone: 'text-emerald-700',
-          hint: 'Casos CERRADOS cuyo servicio quedó completo: el equipo quedó funcionando/OK. Nunca supera a “Cerradas”.',
+          hint: 'De las CERRADAS, cuántas quedaron completas (el equipo quedó funcionando/OK). Nunca supera a “Cerradas”.',
         },
         {
           label: 'Incompletas',
           value: ops.incomplete_total,
           tone: 'text-amber-700',
-          hint: 'Casos CERRADOS que quedaron incompletos (p. ej. faltó un repuesto y algo quedó pendiente).',
-        },
-        {
-          label: 'En espera',
-          value: ops.waiting_now,
-          tone: 'text-orange-700',
-          hint: 'Casos detenidos ahora mismo esperando repuestos o respuesta del cliente.',
+          hint: 'De las CERRADAS, cuántas quedaron incompletas (p. ej. faltó un repuesto y algo quedó pendiente).',
         },
         {
           label: 'FCR',
@@ -241,7 +256,7 @@
 {:else if tab === 'resumen'}
   <!-- ══ RESUMEN ══ -->
   <div class="animate-fade-up">
-    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {#each kpis as k, i}
         <Card>
           <div class="relative">
@@ -249,17 +264,20 @@
               <p class="text-xs font-medium uppercase tracking-wide text-slate-400">{k.label}</p>
               <button
                 type="button"
-                class="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-brand-600 {openHint === i ? 'bg-brand-50 text-brand-600' : ''}"
+                class="-mr-1 -mt-1 grid h-6 w-6 shrink-0 place-items-center rounded-full text-slate-300 transition hover:bg-slate-100 hover:text-brand-600 {shownHint === i ? 'bg-brand-50 text-brand-600' : ''}"
                 on:click={() => toggleHint(i)}
+                on:mouseenter={() => (hoverHint = i)}
+                on:mouseleave={() => (hoverHint = null)}
+                on:focus={() => (hoverHint = i)}
+                on:blur={() => (hoverHint = null)}
                 aria-label="Qué significa {k.label}"
-                title="¿Qué significa?"
               >
                 <Info class="h-3.5 w-3.5" />
               </button>
             </div>
             <p class="mt-1 text-2xl font-bold tabular-nums {k.tone}">{k.value}</p>
 
-            {#if openHint === i}
+            {#if shownHint === i}
               <div
                 class="animate-fade-up absolute left-0 right-0 top-full z-30 mt-2 rounded-xl border border-slate-200 bg-white p-3 text-xs leading-relaxed text-slate-600 shadow-lg shadow-slate-900/10"
                 role="tooltip"
@@ -279,6 +297,21 @@
         aria-label="Cerrar explicación"
         on:click={() => (openHint = null)}
       ></button>
+    {/if}
+
+    <!-- Reconciliación: nada se pierde — cada caso reportado cae en un estado. -->
+    {#if ops}
+      <p class="mt-3 flex flex-wrap items-center gap-x-1.5 gap-y-1 rounded-xl border border-slate-200 bg-slate-50/70 px-3.5 py-2 text-xs text-slate-500">
+        <span class="font-semibold text-slate-700">Reportadas {ops.reported_total}</span>
+        <span class="text-slate-400">=</span>
+        <span class="font-medium text-sky-700">En proceso {ops.active_total}</span>
+        <span class="text-slate-400">+</span>
+        <span class="font-medium text-orange-700">En espera {ops.waiting_total}</span>
+        <span class="text-slate-400">+</span>
+        <span class="font-medium text-emerald-700">Cerradas {ops.closed_total}</span>
+        <span class="text-slate-400">+</span>
+        <span class="font-medium text-slate-500">Anuladas {ops.cancelled_total}</span>
+      </p>
     {/if}
 
     <div class="mt-4 grid gap-4 lg:grid-cols-2">

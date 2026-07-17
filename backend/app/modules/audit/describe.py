@@ -25,6 +25,47 @@ VERBS: dict[str, str] = {
     "DELETE": "Eliminó",
 }
 
+STATUS_LABELS: dict[str, str] = {
+    "open": "Abierto",
+    "assigned": "Asignado",
+    "in_progress": "En progreso",
+    "waiting_parts": "Espera repuestos",
+    "waiting_client": "Espera cliente",
+    "closed": "Cerrado",
+    "cancelled": "Anulado",
+}
+PRIORITY_LABELS: dict[str, str] = {
+    "low": "Baja",
+    "medium": "Media",
+    "high": "Alta",
+    "critical": "Crítica",
+}
+COMPLETION_LABELS: dict[str, str] = {"complete": "Completo", "incomplete": "Incompleto"}
+TYPE_LABELS: dict[str, str] = {
+    "corrective": "Correctivo",
+    "preventive": "Preventivo",
+    "calibration": "Calibración",
+    "installation": "Instalación",
+    "inspection": "Inspección",
+}
+
+
+def summarize_case(body: dict) -> list[str]:
+    """Partes legibles de lo que cambió en un caso (sin tocar la BD).
+    `assigned_to` y el código del caso los resuelve el middleware."""
+    parts: list[str] = []
+    if "status" in body and body["status"]:
+        parts.append(f"estado → {STATUS_LABELS.get(body['status'], body['status'])}")
+    if "priority" in body and body["priority"]:
+        parts.append(f"prioridad → {PRIORITY_LABELS.get(body['priority'], body['priority'])}")
+    if "completion" in body and body["completion"]:
+        parts.append(f"servicio {COMPLETION_LABELS.get(body['completion'], body['completion'])}")
+    if "sla_due_at" in body:
+        parts.append("SLA definido" if body["sla_due_at"] else "SLA quitado")
+    if body.get("title") or body.get("description"):
+        parts.append("editó detalles")
+    return parts
+
 
 def _looks_id(part: str) -> bool:
     try:

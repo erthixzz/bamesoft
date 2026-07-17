@@ -161,6 +161,7 @@ async def record(
     entity_id: str | None,
     path: str | None,
     status_code: int | None,
+    detail: str | None = None,
 ) -> None:
     db.add(
         AuditLog(
@@ -170,6 +171,7 @@ async def record(
             clinic_id=clinic_id,
             method=method,
             action=action,
+            detail=detail,
             entity=entity,
             entity_id=entity_id,
             path=path,

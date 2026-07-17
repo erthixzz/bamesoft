@@ -16,6 +16,7 @@ class AuditLogOut(BaseModel):
     actor_role: str | None = None
     method: str
     action: str
+    detail: str | None = None
     entity: str | None = None
     entity_id: str | None = None
     status_code: int | None = None

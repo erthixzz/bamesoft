@@ -77,6 +77,9 @@ class OperationsReport(BaseModel):
     closed_total: int = 0
     complete_total: int = 0
     incomplete_total: int = 0
+    active_total: int = 0
+    waiting_total: int = 0
+    cancelled_total: int = 0
     waiting_now: int = 0
     daily: list[DailyPoint] = Field(default_factory=list)
     by_reporter: list[ReporterRow] = Field(default_factory=list)

@@ -64,6 +64,9 @@ export interface OperationsReport {
   closed_total: number;
   complete_total: number;
   incomplete_total: number;
+  active_total: number;
+  waiting_total: number;
+  cancelled_total: number;
   waiting_now: number;
   daily: DailyPoint[];
   by_reporter: ReporterRow[];

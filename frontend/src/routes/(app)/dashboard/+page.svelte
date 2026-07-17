@@ -129,21 +129,23 @@
     : 0;
 
   $: kpiCards = [
-    { icon: Activity, label: 'Casos activos', value: kActive, tone: 'brand', sub: `${cases.length} en total` },
-    { icon: Wrench, label: 'En progreso', value: kInProgress, tone: 'amber', sub: 'siendo atendidos' },
+    { icon: Activity, label: 'Casos activos', value: kActive, tone: 'brand', sub: `${cases.length} en total`, alert: false },
     {
       icon: UserMinus,
       label: 'Sin asignar',
       value: kUnassigned,
       tone: kUnassigned > 0 ? 'rose' : 'emerald',
-      sub: kUnassigned > 0 ? 'requieren ingeniero' : 'todo asignado',
+      sub: kUnassigned > 0 ? '¡asignar ingeniero!' : 'todo asignado',
+      alert: kUnassigned > 0, // titila en rojo mientras haya casos sin asignar
     },
+    { icon: Wrench, label: 'En progreso', value: kInProgress, tone: 'amber', sub: 'siendo atendidos', alert: false },
     {
       icon: AlarmClock,
       label: 'SLA en riesgo',
       value: kSlaRisk,
       tone: kSlaRisk > 0 ? 'rose' : 'emerald',
       sub: kSlaRisk > 0 ? 'vencidos o por vencer' : 'al día',
+      alert: false,
     },
   ];
 
@@ -254,10 +256,14 @@
 <!-- KPIs (en tiempo real) -->
 <div class="grid grid-cols-2 gap-3 lg:grid-cols-4">
   {#each kpiCards as kpi, i (kpi.label)}
-    <div in:fly={{ y: 12, duration: 400, delay: 50 + i * 60, easing: cubicOut }}>
+    <div
+      in:fly={{ y: 12, duration: 400, delay: 50 + i * 60, easing: cubicOut }}
+      class="rounded-2xl {kpi.alert ? 'animate-pulse-ring ring-2 ring-rose-400' : ''}"
+      style={kpi.alert ? '--glow:rgba(244,63,94,.55)' : ''}
+    >
       <Card>
         <div class="flex items-start gap-3">
-          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl {TONES[kpi.tone]}">
+          <div class="grid h-10 w-10 shrink-0 place-items-center rounded-xl {TONES[kpi.tone]} {kpi.alert ? 'animate-blink' : ''}">
             <svelte:component this={kpi.icon} class="h-5 w-5" />
           </div>
           <div class="min-w-0">

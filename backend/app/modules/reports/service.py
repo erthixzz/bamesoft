@@ -31,6 +31,7 @@ from app.modules.standards.models import EquipmentStandard, Standard
 from app.modules.users.models import User
 
 _WAITING = (CaseStatus.WAITING_PARTS, CaseStatus.WAITING_CLIENT)
+_ACTIVE = (CaseStatus.OPEN, CaseStatus.ASSIGNED, CaseStatus.IN_PROGRESS)
 
 
 def _opened_col():
@@ -285,12 +286,25 @@ async def operations(
                         & (Case.completion == CaseCompletion.INCOMPLETE)
                     )
                     .label("incomplete"),
+                    # Buckets por estado actual (dentro del rango) para que TODO
+                    # caso reportado quede contabilizado y nada se "pierda":
+                    # reportadas = en proceso + en espera + cerradas + anuladas.
+                    func.count()
+                    .filter(Case.status.in_(_ACTIVE))
+                    .label("active"),
+                    func.count()
+                    .filter(Case.status.in_(_WAITING))
+                    .label("waiting"),
+                    func.count()
+                    .filter(Case.status == CaseStatus.CANCELLED)
+                    .label("cancelled"),
                 ).where(*rng),
                 scope,
             )
         )
     ).one()
 
+    # "En espera ahora mismo" (sin filtro de rango): útil como estado operativo.
     waiting_now = await db.scalar(
         _scope_case(select(func.count()).select_from(Case).where(Case.status.in_(_WAITING)), scope)
     )
@@ -355,6 +369,9 @@ async def operations(
         closed_total=totals.closed or 0,
         complete_total=totals.complete or 0,
         incomplete_total=totals.incomplete or 0,
+        active_total=totals.active or 0,
+        waiting_total=totals.waiting or 0,
+        cancelled_total=totals.cancelled or 0,
         waiting_now=waiting_now or 0,
         daily=daily,
         by_reporter=by_reporter,

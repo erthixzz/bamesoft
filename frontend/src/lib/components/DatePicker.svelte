@@ -4,9 +4,11 @@
    *  Valor enlazado (bind:value): ISO "YYYY-MM-DD" o "YYYY-MM-DDTHH:MM".
    *  Responsive: popover anclado en escritorio, hoja centrada en móvil.
    */
-  import { onMount, tick } from 'svelte';
+  import { onMount, tick, createEventDispatcher } from 'svelte';
   import { Calendar, ChevronLeft, ChevronRight, Clock, X, Minus, Plus } from 'lucide-svelte';
   import { portal } from '$lib/actions/portal';
+
+  const dispatch = createEventDispatcher<{ change: string }>();
 
   export let label = '';
   export let value = ''; // YYYY-MM-DD o YYYY-MM-DDTHH:MM
@@ -117,6 +119,7 @@
   function emit(p: { y: number; m: number; d: number }) {
     const datePart = `${p.y}-${pad(p.m + 1)}-${pad(p.d)}`;
     value = mode === 'datetime' ? `${datePart}T${pad(hh)}:${pad(mm)}` : datePart;
+    dispatch('change', value);
   }
 
   function pickDay(cell: Cell) {
@@ -173,6 +176,7 @@
   function clear() {
     value = '';
     open = false;
+    dispatch('change', '');
   }
 
   function goToday() {
