@@ -11,6 +11,9 @@
     typeLabel: string;
     priorityLabel: string;
     completionLabel: string;
+    /** Satisfacción del servicio (carita). */
+    satisfactionLabel: string;
+    satisfactionEmoji: string;
     title: string;
     description: string;
     equipmentLabel: string;
@@ -158,9 +161,15 @@
           <div style="width:42%;background:#f8fafc;color:#475569;font-weight:600;padding:5px 8px;">Nombre</div>
           <div style="flex:1;padding:5px 8px;">{txt(report.receiverName)}</div>
         </div>
-        <div style="display:flex;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;">
+        <div style="display:flex;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;margin-bottom:6px;">
           <div style="width:42%;background:#f8fafc;color:#475569;font-weight:600;padding:5px 8px;">Documento</div>
           <div style="flex:1;padding:5px 8px;">{txt(report.receiverDoc)}</div>
+        </div>
+        <div style="display:flex;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;align-items:center;">
+          <div style="width:42%;background:#f8fafc;color:#475569;font-weight:600;padding:5px 8px;">Satisfacción</div>
+          <div style="flex:1;padding:5px 8px;font-weight:600;">
+            {#if report.satisfactionEmoji}<span style="font-size:16px;">{report.satisfactionEmoji}</span> {/if}{txt(report.satisfactionLabel)}
+          </div>
         </div>
       </div>
       <div style="width:260px;text-align:center;">

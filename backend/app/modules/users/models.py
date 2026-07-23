@@ -37,6 +37,8 @@ class User(Base, UUIDPrimaryKey, Timestamps):
     phone: Mapped[str | None] = mapped_column(String(32))
     license_number: Mapped[str | None] = mapped_column(String(64))
     avatar_url: Mapped[str | None] = mapped_column(String(512))
+    # Hoja de vida (CV): ruta en Supabase Storage del archivo único del usuario.
+    cv_path: Mapped[str | None] = mapped_column(String(1024))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 

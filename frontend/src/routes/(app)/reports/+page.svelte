@@ -7,6 +7,7 @@
   import DatePicker from '$lib/components/DatePicker.svelte';
   import Button from '$lib/components/Button.svelte';
   import Select from '$lib/components/Select.svelte';
+  import Modal from '$lib/components/Modal.svelte';
   import Donut from '$lib/components/charts/Donut.svelte';
   import BarList from '$lib/components/charts/BarList.svelte';
   import { reportsApi } from '$lib/modules/reports/api';
@@ -17,11 +18,14 @@
     OperationsReport,
     ProductivityReport,
     ServicesReport,
+    ServiceRow,
   } from '$lib/modules/reports/types';
   import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
   import {
     TYPE_LABEL,
+    TYPE_OPTIONS,
     COMPLETION_LABEL,
+    SATISFACTION_META,
     STATUS_META,
     PRIORITY_META,
     elapsedBetween,
@@ -41,6 +45,7 @@
     Building2,
     CalendarRange,
     Info,
+    ShieldAlert,
   } from 'lucide-svelte';
 
   let compliance: ComplianceReport | null = null;
@@ -111,6 +116,32 @@
   // Filtros del apartado Servicios (sobre los datos ya cargados).
   let fEngineer = '';
   let fEquipment = '';
+  let fType = '';
+
+  // Modal de "drill-down": lista de casos detrás de una tarjeta (KPI clicable).
+  let modalOpen = false;
+  let modalTitle = '';
+  let modalRows: ServiceRow[] = [];
+  function openCasesModal(title: string, filter: (s: ServiceRow) => boolean) {
+    modalTitle = title;
+    modalRows = (services?.items ?? []).filter(filter);
+    modalOpen = true;
+  }
+
+  // Totales de satisfacción (caritas) sobre todos los casos del rango.
+  $: satCounts = {
+    bueno: (services?.items ?? []).filter((s) => s.satisfaction === 'bueno').length,
+    regular: (services?.items ?? []).filter((s) => s.satisfaction === 'regular').length,
+    malo: (services?.items ?? []).filter((s) => s.satisfaction === 'malo').length,
+  };
+
+  // Reincidencia de equipos: un equipo con muchos casos en el rango "reincide".
+  const RECURRENCE_MIN = 3;
+  // El backend ya ordena por casos desc, así que el primero es el más reincidente.
+  $: topEquipment =
+    eqReport && eqReport.items.length && eqReport.items[0].cases_total > 0
+      ? eqReport.items[0]
+      : null;
 
   $: maxDaily = ops ? Math.max(1, ...ops.daily.map((d) => Math.max(d.reported, d.closed))) : 1;
   $: maxReporter = ops ? Math.max(1, ...ops.by_reporter.map((r) => r.count)) : 1;
@@ -131,7 +162,8 @@
   $: filteredServices = (services?.items ?? []).filter(
     (s) =>
       (!fEngineer || s.engineer_name === fEngineer) &&
-      (!fEquipment || s.equipment_label === fEquipment),
+      (!fEquipment || s.equipment_label === fEquipment) &&
+      (!fType || s.type === fType),
   );
 
   async function load() {
@@ -172,6 +204,14 @@
   }
   $: shownHint = openHint ?? hoverHint;
 
+  type Kpi = {
+    label: string;
+    value: string | number;
+    tone: string;
+    hint: string;
+    drill?: { title: string; filter: (s: ServiceRow) => boolean };
+  };
+  let kpis: Kpi[] = [];
   $: kpis = ops
     ? [
         {
@@ -209,18 +249,41 @@
           value: ops.complete_total,
           tone: 'text-emerald-700',
           hint: 'De las CERRADAS, cuántas quedaron completas (el equipo quedó funcionando/OK). Nunca supera a “Cerradas”.',
+          drill: { title: 'Casos completos', filter: (s: ServiceRow) => s.completion === 'complete' },
         },
         {
           label: 'Incompletas',
           value: ops.incomplete_total,
           tone: 'text-amber-700',
           hint: 'De las CERRADAS, cuántas quedaron incompletas (p. ej. faltó un repuesto y algo quedó pendiente).',
+          drill: { title: 'Casos incompletos', filter: (s: ServiceRow) => s.completion === 'incomplete' },
         },
         {
           label: 'FCR',
           value: prod ? `${prod.fcr_pct}%` : '—',
           tone: 'text-brand-700',
           hint: 'FCR (First Call Resolution): % de casos resueltos completos “a la primera” — cerrados y completos ÷ total atendidos. Mientras más alto, mejor.',
+        },
+        {
+          label: `${SATISFACTION_META.bueno.emoji} Satisf. buena`,
+          value: satCounts.bueno,
+          tone: 'text-emerald-700',
+          hint: 'Casos calificados con satisfacción "Buena" por quien recibió el servicio. Haz clic para ver cuáles.',
+          drill: { title: 'Satisfacción buena', filter: (s: ServiceRow) => s.satisfaction === 'bueno' },
+        },
+        {
+          label: `${SATISFACTION_META.regular.emoji} Satisf. regular`,
+          value: satCounts.regular,
+          tone: 'text-amber-700',
+          hint: 'Casos calificados con satisfacción "Regular". Haz clic para ver cuáles.',
+          drill: { title: 'Satisfacción regular', filter: (s: ServiceRow) => s.satisfaction === 'regular' },
+        },
+        {
+          label: `${SATISFACTION_META.malo.emoji} Satisf. mala`,
+          value: satCounts.malo,
+          tone: 'text-danger-700',
+          hint: 'Casos calificados con satisfacción "Mala". Haz clic para revisarlos.',
+          drill: { title: 'Satisfacción mala', filter: (s: ServiceRow) => s.satisfaction === 'malo' },
         },
       ]
     : [];
@@ -258,7 +321,7 @@
   <div class="animate-fade-up">
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {#each kpis as k, i}
-        <Card>
+        <Card interactive={!!k.drill}>
           <div class="relative">
             <div class="flex items-start justify-between gap-1">
               <p class="text-xs font-medium uppercase tracking-wide text-slate-400">{k.label}</p>
@@ -275,7 +338,20 @@
                 <Info class="h-3.5 w-3.5" />
               </button>
             </div>
-            <p class="mt-1 text-2xl font-bold tabular-nums {k.tone}">{k.value}</p>
+            {#if k.drill}
+              {@const d = k.drill}
+              <button
+                type="button"
+                class="mt-1 flex items-center gap-1.5 text-2xl font-bold tabular-nums {k.tone} transition hover:opacity-70"
+                on:click={() => openCasesModal(d.title, d.filter)}
+                title="Ver casos"
+              >
+                {k.value}
+                <ArrowRight class="h-4 w-4 opacity-50" />
+              </button>
+            {:else}
+              <p class="mt-1 text-2xl font-bold tabular-nums {k.tone}">{k.value}</p>
+            {/if}
 
             {#if shownHint === i}
               <div
@@ -441,6 +517,7 @@
                 <th class="pr-3">A inicio</th>
                 <th class="pr-3">Trabajo</th>
                 <th class="pr-3">FCR</th>
+                <th class="pr-3" title="Satisfacción: bueno / regular / malo">Satisfacción</th>
                 <th class="pr-3"></th>
               </tr>
             </thead>
@@ -455,6 +532,13 @@
                   <td class="pr-3 tabular-nums text-slate-600">{h(r.avg_to_start_hours)}</td>
                   <td class="pr-3 tabular-nums text-slate-600">{h(r.avg_work_hours)}</td>
                   <td class="pr-3 tabular-nums text-brand-700">{r.fcr_pct}%</td>
+                  <td class="pr-3 tabular-nums">
+                    <span class="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span class="text-emerald-700" title="Bueno">🙂 {r.sat_good}</span>
+                      <span class="text-amber-700" title="Regular">😐 {r.sat_regular}</span>
+                      <span class="text-danger-700" title="Malo">☹️ {r.sat_bad}</span>
+                    </span>
+                  </td>
                   <td class="pr-3">
                     <button
                       type="button"
@@ -479,6 +563,18 @@
       {#if !eqReport || eqReport.items.length === 0}
         <EmptyState icon={Stethoscope} title="Sin servicios en el rango" description="Ningún equipo tuvo casos en las fechas seleccionadas." />
       {:else}
+        {#if topEquipment}
+          <div class="mb-4 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <ShieldAlert class="h-5 w-5 shrink-0 text-amber-600" />
+            <div class="min-w-0 text-sm">
+              <span class="font-semibold text-amber-800">Equipo con más casos (reincidencia):</span>
+              <a class="font-medium text-amber-900 hover:underline" href={`/equipment/${topEquipment.code}`}>
+                {topEquipment.code} · {topEquipment.name}
+              </a>
+              <span class="text-amber-700">— {topEquipment.cases_total} casos en el rango.</span>
+            </div>
+          </div>
+        {/if}
         <div class="overflow-x-auto">
           <table class="w-full text-sm">
             <thead class="text-left text-xs uppercase text-slate-500">
@@ -503,7 +599,16 @@
                     </a>
                   </td>
                   <td class="pr-3 text-slate-600">{r.sector_name ?? '—'}</td>
-                  <td class="pr-3 tabular-nums font-semibold text-slate-800">{r.cases_total}</td>
+                  <td class="pr-3 tabular-nums font-semibold text-slate-800">
+                    <span class="inline-flex items-center gap-1.5">
+                      {r.cases_total}
+                      {#if r.cases_total >= RECURRENCE_MIN}
+                        <span class="badge bg-amber-50 text-amber-700" title="Equipo reincidente ({r.cases_total} casos)">
+                          <ShieldAlert class="mr-0.5 inline h-3 w-3" /> Reincidente
+                        </span>
+                      {/if}
+                    </span>
+                  </td>
                   <td class="pr-3 tabular-nums text-emerald-700">{r.completed}</td>
                   <td class="pr-3 tabular-nums text-amber-700">{r.incomplete}</td>
                   <td class="pr-3 tabular-nums text-slate-600">{r.corrective} / {r.preventive}</td>
@@ -522,9 +627,10 @@
   <!-- ══ SERVICIOS (detalle) ══ -->
   <div class="animate-fade-up">
     <Card title="Historial de servicios" description="Cada servicio: qué se hizo, quién atendió y cuánto se demoró." icon={ClipboardList} accent="amber">
-      <div class="mb-4 grid gap-3 sm:grid-cols-2 lg:max-w-2xl">
+      <div class="mb-4 grid gap-3 sm:grid-cols-3 lg:max-w-3xl">
         <Select bind:value={fEngineer} options={engineerOptions} placeholder="Todos los ingenieros" />
         <Select bind:value={fEquipment} options={equipmentOptions} placeholder="Todos los equipos" />
+        <Select bind:value={fType} options={TYPE_OPTIONS} placeholder="Todos los tipos de actividad" />
       </div>
 
       {#if filteredServices.length === 0}
@@ -584,3 +690,41 @@
     </Card>
   </div>
 {/if}
+
+<!-- Modal de detalle: casos detrás de una tarjeta clicable -->
+<Modal bind:open={modalOpen} title={modalTitle} size="lg" on:close={() => (modalOpen = false)}>
+  {#if modalRows.length === 0}
+    <EmptyState icon={ClipboardList} title="Sin casos" description="No hay casos que coincidan en el rango seleccionado." />
+  {:else}
+    <p class="mb-3 text-sm text-slate-500">{modalRows.length} caso(s). Haz clic en el código para abrirlo.</p>
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead class="text-left text-xs uppercase text-slate-500">
+          <tr class="border-b border-slate-200">
+            <th class="py-2 pr-3">Caso</th>
+            <th class="pr-3">Equipo</th>
+            <th class="pr-3">Tipo</th>
+            <th class="pr-3">Ingeniero</th>
+            <th class="pr-3">Fecha</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-100">
+          {#each modalRows as s (s.case_id)}
+            <tr>
+              <td class="py-2.5 pr-3">
+                <a class="font-mono text-xs font-semibold text-brand-700 hover:underline" href={`/cases/${s.code}`}>{s.code}</a>
+                <div class="max-w-[220px] truncate text-slate-600" title={s.title}>{s.title}</div>
+              </td>
+              <td class="max-w-[160px] truncate pr-3 text-slate-600" title={s.equipment_label}>{s.equipment_label}</td>
+              <td class="pr-3 text-slate-600">{typeLabel(s.type)}</td>
+              <td class="pr-3 text-slate-600">
+                {#if s.engineer_name}{s.engineer_name}{:else}<span class="value-pending">Sin asignar</span>{/if}
+              </td>
+              <td class="whitespace-nowrap pr-3 text-slate-500">{formatDate(s.opened_at)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
+</Modal>

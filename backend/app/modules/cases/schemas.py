@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.db.enums import CaseCompletion, CasePriority, CaseStatus, CaseType
+from app.db.enums import CaseCompletion, CasePriority, CaseSatisfaction, CaseStatus, CaseType
 
 
 class CaseBase(BaseModel):
@@ -32,6 +32,7 @@ class CaseResolution(BaseModel):
     parts_count: int | None = Field(default=None, ge=0)
     parts_detail: str | None = None
     completion: CaseCompletion | None = None
+    satisfaction: CaseSatisfaction | None = None
     receiver_name: str | None = Field(default=None, max_length=255)
     receiver_doc: str | None = Field(default=None, max_length=64)
     signature_path: str | None = Field(default=None, max_length=1024)

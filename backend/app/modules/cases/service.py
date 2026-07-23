@@ -146,6 +146,7 @@ async def update_case(
         obj.closed_at = None
         obj.finished_at = None
         obj.completion = None
+        obj.satisfaction = None
     if new_status == CaseStatus.IN_PROGRESS and obj.work_started_at is None:
         obj.work_started_at = now
     if data.get("assigned_to") and obj.status == CaseStatus.OPEN:

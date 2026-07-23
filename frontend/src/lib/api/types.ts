@@ -24,7 +24,8 @@ export type CaseType =
   | 'preventive'
   | 'calibration'
   | 'installation'
-  | 'inspection';
+  | 'inspection'
+  | 'mishandling';
 
 export type CaseStatus =
   | 'open'
@@ -38,6 +39,8 @@ export type CaseStatus =
 export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 
 export type CaseCompletion = 'complete' | 'incomplete';
+
+export type CaseSatisfaction = 'bueno' | 'regular' | 'malo';
 
 export type AlertType =
   | 'preventive_due'
@@ -57,6 +60,7 @@ export type DocumentType =
   | 'life_sheet'
   | 'photo'
   | 'signature'
+  | 'tecnovigilancia'
   | 'other';
 
 export interface Paginated<T> {

@@ -22,7 +22,7 @@
   import { toasts } from '$lib/stores/toasts';
   import { timeFromNow, formatDateTime } from '$lib/utils/format';
   import type { UserRole } from '$lib/api/types';
-  import { Users, Copy, UserX, Pencil, Check, ShieldCheck, PlusCircle, Search } from 'lucide-svelte';
+  import { Users, Copy, UserX, Pencil, Check, ShieldCheck, PlusCircle, Search, Eye } from 'lucide-svelte';
 
   function roleLabel(r: string): string {
     return ROLE_LABELS[r as UserRole] ?? r;
@@ -52,8 +52,18 @@
     { key: 'clinic_id', label: 'Compañía' },
     { key: 'role', label: 'Rol' },
     { key: 'last_seen_at', label: 'Última conexión' },
+    { key: 'cv', label: 'Hoja de vida' },
     { key: 'active', label: 'Estado' },
   ];
+
+  async function viewCv(id: string) {
+    try {
+      const { url } = await usersApi.cvUrl(id);
+      window.open(url, '_blank');
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'No se pudo abrir la hoja de vida');
+    }
+  }
 
   async function load() {
     try {
@@ -155,6 +165,19 @@
             </span>
           {:else}
             <span class="value-pending">Nunca</span>
+          {/if}
+        {:else if column === 'cv'}
+          {#if row.cv_path}
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 text-sm font-medium text-brand-600 hover:underline"
+              title="Ver hoja de vida"
+              on:click={() => viewCv(row.id)}
+            >
+              <Eye class="h-4 w-4" /> Ver
+            </button>
+          {:else}
+            <span class="value-pending">—</span>
           {/if}
         {:else if column === 'active'}
           <Badge tone={row.active ? 'green' : 'gray'}>{row.active ? 'Activo' : 'Inactivo'}</Badge>

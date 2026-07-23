@@ -35,6 +35,7 @@ class CaseType(StrEnum):
     CALIBRATION = "calibration"
     INSTALLATION = "installation"
     INSPECTION = "inspection"
+    MISHANDLING = "mishandling"  # Daño por mal manejo
 
 
 class CaseStatus(StrEnum):
@@ -61,6 +62,14 @@ class CaseCompletion(StrEnum):
     INCOMPLETE = "incomplete"
 
 
+class CaseSatisfaction(StrEnum):
+    """Satisfacción de quien recibe el servicio (3 caritas)."""
+
+    BUENO = "bueno"
+    REGULAR = "regular"
+    MALO = "malo"
+
+
 class AlertType(StrEnum):
     PREVENTIVE_DUE = "preventive_due"
     CALIBRATION_DUE = "calibration_due"
@@ -84,4 +93,5 @@ class DocumentType(StrEnum):
     LIFE_SHEET = "life_sheet"
     PHOTO = "photo"
     SIGNATURE = "signature"
+    TECNOVIGILANCIA = "tecnovigilancia"
     OTHER = "other"

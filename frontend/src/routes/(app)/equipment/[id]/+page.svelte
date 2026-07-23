@@ -4,6 +4,7 @@
   import { browser } from '$app/environment';
   import Card from '$lib/components/Card.svelte';
   import Button from '$lib/components/Button.svelte';
+  import Select from '$lib/components/Select.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
   import StatusBadge from '$lib/modules/equipment/components/StatusBadge.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
@@ -34,6 +35,12 @@
   import { calibrationsApi } from '$lib/modules/calibrations/api';
   import { maintenanceApi } from '$lib/modules/maintenance/api';
   import { documentsApi } from '$lib/modules/documents/api';
+  import {
+    DOC_TYPE_ORDER,
+    DOC_TYPE_LABEL,
+    EQUIPMENT_DOC_TYPE_OPTIONS,
+  } from '$lib/modules/documents/ui';
+  import type { DocumentType } from '$lib/api/types';
   import type { Equipment } from '$lib/modules/equipment/types';
   import type { Case } from '$lib/modules/cases/types';
   import type { Calibration } from '$lib/modules/calibrations/types';
@@ -54,6 +61,14 @@
   let error: string | null = null;
   let editOpen = false;
   let uploading = false;
+  let uploadType = 'manual';
+
+  // Documentos agrupados por tipo (carpetas), en el orden definido.
+  $: docFolders = DOC_TYPE_ORDER.map((type) => ({
+    type,
+    label: DOC_TYPE_LABEL[type],
+    items: docs.filter((d) => d.type === type),
+  })).filter((f) => f.items.length > 0);
 
   $: id = $page.params.id ?? '';
   $: setPageTitle(eq ? `${eq.code} · ${eq.name}` : 'Equipo');
@@ -108,13 +123,25 @@
     try {
       await documentsApi.upload(file, {
         title: file.name,
-        type: 'manual',
+        type: uploadType as DocumentType,
         equipment_id: eq.id,
       });
       docs = await documentsApi.forEquipment(eq.id);
+      toasts.success('Documento subido');
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : 'No se pudo subir el documento');
     } finally {
       uploading = false;
       input.value = '';
+    }
+  }
+
+  async function openDoc(id: string) {
+    try {
+      const { url } = await documentsApi.signedUrl(id);
+      window.open(url, '_blank');
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : 'No se pudo abrir el documento');
     }
   }
 </script>
@@ -260,22 +287,48 @@
 
     <Card title={`Documentos (${docs.length})`} icon={FolderOpen} accent="cyan">
       <svelte:fragment slot="actions">
-        <label class="btn-secondary inline-flex cursor-pointer items-center gap-2">
-          <FileUp class="h-4 w-4" />
-          {uploading ? 'Subiendo…' : 'Subir'}
-          <input type="file" class="hidden" on:change={onFile} disabled={uploading} />
-        </label>
+        <div class="flex items-center gap-2">
+          <div class="w-40">
+            <Select bind:value={uploadType} options={EQUIPMENT_DOC_TYPE_OPTIONS} />
+          </div>
+          <label class="btn-secondary inline-flex cursor-pointer items-center gap-2 {uploading ? 'pointer-events-none opacity-60' : ''}">
+            <FileUp class="h-4 w-4" />
+            {uploading ? 'Subiendo…' : 'Subir'}
+            <input type="file" class="hidden" on:change={onFile} disabled={uploading} />
+          </label>
+        </div>
       </svelte:fragment>
-      <ul class="space-y-2 text-sm">
-        {#each docs as d}
-          <li class="flex justify-between border-b border-slate-100 py-2 last:border-0">
-            <span>{d.title} <span class="text-xs text-slate-400">({d.type})</span></span>
-            <span class="text-slate-500">{formatDate(d.created_at)}</span>
-          </li>
-        {:else}
-          <li class="value-pending">Sin documentos.</li>
-        {/each}
-      </ul>
+
+      {#if docFolders.length === 0}
+        <p class="value-pending">Sin documentos.</p>
+      {:else}
+        <div class="space-y-4">
+          {#each docFolders as folder (folder.type)}
+            <div>
+              <h4 class="mb-1.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-slate-500">
+                <FolderOpen class="h-3.5 w-3.5" />
+                {folder.label}
+                <span class="font-normal text-slate-400">({folder.items.length})</span>
+              </h4>
+              <ul class="space-y-1 text-sm">
+                {#each folder.items as d (d.id)}
+                  <li class="flex items-center justify-between gap-2 border-b border-slate-100 py-2 last:border-0">
+                    <button
+                      type="button"
+                      class="flex min-w-0 items-center gap-2 text-left text-slate-700 hover:text-brand-600"
+                      on:click={() => openDoc(d.id)}
+                    >
+                      <FileText class="h-4 w-4 shrink-0 text-slate-400" />
+                      <span class="truncate">{d.title}</span>
+                    </button>
+                    <span class="shrink-0 text-xs text-slate-500">{formatDate(d.created_at)}</span>
+                  </li>
+                {/each}
+              </ul>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </Card>
   </div>
 

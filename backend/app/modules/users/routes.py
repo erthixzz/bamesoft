@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import uuid
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
 from app.modules.auth.deps import clinic_scope, require_authenticated, require_clinic_admin
+from app.modules.documents.schemas import SignedUrlOut
 from app.modules.users import service
 from app.modules.users.models import User
 from app.modules.users.schemas import UserCreate, UserInvite, UserOut, UserUpdate
@@ -78,3 +79,34 @@ async def deactivate_user(
     current: User = Depends(require_clinic_admin),
 ) -> None:
     await service.deactivate_user(db, user_id, clinic_scope(current))
+
+
+@router.post("/{user_id}/cv", response_model=UserOut)
+async def upload_cv(
+    user_id: uuid.UUID,
+    file: UploadFile = File(...),
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_clinic_admin),
+) -> User:
+    """Sube (o reemplaza) la hoja de vida (CV) del usuario."""
+    body = await file.read()
+    return await service.upload_cv(
+        db,
+        user_id,
+        filename=file.filename or "cv",
+        content=body,
+        content_type=file.content_type or "application/octet-stream",
+        scope=clinic_scope(current),
+    )
+
+
+@router.get("/{user_id}/cv-url", response_model=SignedUrlOut)
+async def get_cv_url(
+    user_id: uuid.UUID,
+    expires_in: int = 3600,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_authenticated),
+) -> SignedUrlOut:
+    """URL firmada para ver la hoja de vida del usuario."""
+    url = await service.cv_signed_url(db, user_id, clinic_scope(current))
+    return SignedUrlOut(url=url, expires_in=expires_in)

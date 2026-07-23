@@ -8,7 +8,9 @@
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import PriorityBadge from '$lib/modules/cases/components/PriorityBadge.svelte';
   import { casesApi } from '$lib/modules/cases/api';
+  import { TYPE_LABEL, COMPLETION_LABEL } from '$lib/modules/cases/ui';
   import type { Case } from '$lib/modules/cases/types';
+  import type { CaseType, CaseCompletion } from '$lib/api/types';
   import type { CtxItem } from '$lib/stores/contextMenu';
   import { formatDate } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
@@ -19,6 +21,9 @@
 
   let rows: Case[] = [];
   let loading = true;
+
+  const typeLabel = (t: string) => TYPE_LABEL[t as CaseType] ?? t;
+  const complLabel = (c: string) => COMPLETION_LABEL[c as CaseCompletion] ?? c;
   // El operario (service) solo ve los casos que él reportó.
   $: onlyMine = $role === 'service';
   const columns = [
@@ -27,6 +32,7 @@
     { key: 'type', label: 'Tipo' },
     { key: 'priority', label: 'Prioridad' },
     { key: 'status', label: 'Estado' },
+    { key: 'completion', label: 'Estado final' },
     { key: 'opened_at', label: 'Apertura' },
   ];
 
@@ -94,6 +100,16 @@
           <CaseStatusBadge status={row.status} />
         {:else if column === 'priority'}
           <PriorityBadge priority={row.priority} />
+        {:else if column === 'type'}
+          {typeLabel(row.type)}
+        {:else if column === 'completion'}
+          {#if row.completion}
+            <span class="badge {row.completion === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
+              {complLabel(row.completion)}
+            </span>
+          {:else}
+            <span class="value-pending">—</span>
+          {/if}
         {:else if column === 'opened_at'}
           {formatDate(row.opened_at)}
         {:else if column === 'code'}

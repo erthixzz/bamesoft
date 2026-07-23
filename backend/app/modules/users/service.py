@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import uuid
 from collections.abc import Sequence
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BadRequest, Conflict, Forbidden, NotFound
 from app.db.enums import UserRole
+from app.integrations import supabase as sb
 from app.integrations.supabase import supabase_admin
 from app.modules.users.models import User
 from app.modules.users.schemas import UserCreate, UserInvite, UserUpdate
@@ -127,3 +129,36 @@ async def deactivate_user(
     user = await get_user(db, user_id, scope)
     user.active = False
     await db.flush()
+
+
+async def upload_cv(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    filename: str,
+    content: bytes,
+    content_type: str,
+    scope: uuid.UUID | None = None,
+) -> User:
+    """Sube (o reemplaza) la hoja de vida del usuario en Supabase Storage."""
+    user = await get_user(db, user_id, scope)
+    ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
+    path = f"cv/{user_id}/{ts}_{sb.safe_filename(filename)}"
+    try:
+        sb.upload_file(path, content, content_type=content_type)
+    except Exception as exc:  # error de Storage → mensaje legible (con CORS)
+        raise BadRequest(f"No se pudo subir el archivo: {exc}") from exc
+    user.cv_path = path
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def cv_signed_url(
+    db: AsyncSession, user_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> str:
+    """Devuelve una URL firmada para ver la hoja de vida del usuario."""
+    user = await get_user(db, user_id, scope)
+    if not user.cv_path:
+        raise NotFound("Hoja de vida")
+    return sb.signed_url(user.cv_path)

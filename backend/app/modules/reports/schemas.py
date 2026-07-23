@@ -47,6 +47,10 @@ class ProductivityRow(BaseModel):
     avg_work_hours: float | None = None  # inicio → fin
     fcr_count: int = 0  # resueltos completos a la primera (FCR)
     fcr_pct: float = 0.0
+    # Satisfacción de quien recibe el servicio (caritas), solo casos cerrados.
+    sat_good: int = 0
+    sat_regular: int = 0
+    sat_bad: int = 0
 
 
 class ProductivityReport(BaseModel):
@@ -56,6 +60,9 @@ class ProductivityReport(BaseModel):
     incomplete: int = 0
     fcr_count: int = 0
     fcr_pct: float = 0.0
+    sat_good: int = 0
+    sat_regular: int = 0
+    sat_bad: int = 0
 
 
 class DailyPoint(BaseModel):
@@ -118,6 +125,7 @@ class ServiceRow(BaseModel):
     type: str
     status: str
     completion: str | None = None
+    satisfaction: str | None = None
     work_performed: str | None = None
     operation_minutes: int | None = None
     opened_at: datetime | None = None

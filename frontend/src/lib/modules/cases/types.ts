@@ -1,4 +1,10 @@
-import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+import type {
+  CaseCompletion,
+  CasePriority,
+  CaseSatisfaction,
+  CaseStatus,
+  CaseType,
+} from '$lib/api/types';
 
 /** Campos del soporte/cierre del servicio (compartidos entre Case y CaseUpdate). */
 export interface CaseResolution {
@@ -7,6 +13,7 @@ export interface CaseResolution {
   parts_count?: number | null;
   parts_detail?: string | null;
   completion?: CaseCompletion | null;
+  satisfaction?: CaseSatisfaction | null;
   receiver_name?: string | null;
   receiver_doc?: string | null;
   signature_path?: string | null;

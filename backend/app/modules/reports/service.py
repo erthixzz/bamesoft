@@ -7,7 +7,7 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import and_, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.enums import CaseCompletion, CaseStatus, CaseType
+from app.db.enums import CaseCompletion, CaseSatisfaction, CaseStatus, CaseType
 from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
 from app.modules.reports.schemas import (
@@ -199,6 +199,16 @@ async def productivity(
     fcr = func.count().filter(
         (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
     )
+    # Satisfacción (caritas) solo cuenta en casos ya cerrados.
+    sat_good = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.BUENO)
+    )
+    sat_regular = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.REGULAR)
+    )
+    sat_bad = func.count().filter(
+        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.MALO)
+    )
 
     stmt = (
         select(
@@ -212,6 +222,9 @@ async def productivity(
             avg_secs(Case.accepted_at, Case.work_started_at).label("to_start"),
             avg_secs(Case.work_started_at, Case.finished_at).label("work"),
             fcr.label("fcr"),
+            sat_good.label("sat_good"),
+            sat_regular.label("sat_regular"),
+            sat_bad.label("sat_bad"),
         )
         .join(User, User.id == Case.assigned_to, isouter=True)
         .where(Case.assigned_to.is_not(None), *rng)
@@ -223,6 +236,7 @@ async def productivity(
 
     items: list[ProductivityRow] = []
     tot_att = tot_comp = tot_inc = tot_fcr = 0
+    tot_good = tot_reg = tot_bad = 0
     for r in rows:
         att = r.attended or 0
         items.append(
@@ -238,12 +252,18 @@ async def productivity(
                 avg_work_hours=_hours(r.work),
                 fcr_count=r.fcr or 0,
                 fcr_pct=round((r.fcr or 0) / att * 100.0, 1) if att else 0.0,
+                sat_good=r.sat_good or 0,
+                sat_regular=r.sat_regular or 0,
+                sat_bad=r.sat_bad or 0,
             )
         )
         tot_att += att
         tot_comp += r.completed or 0
         tot_inc += r.incomplete or 0
         tot_fcr += r.fcr or 0
+        tot_good += r.sat_good or 0
+        tot_reg += r.sat_regular or 0
+        tot_bad += r.sat_bad or 0
 
     return ProductivityReport(
         items=items,
@@ -252,6 +272,9 @@ async def productivity(
         incomplete=tot_inc,
         fcr_count=tot_fcr,
         fcr_pct=round(tot_fcr / tot_att * 100.0, 1) if tot_att else 0.0,
+        sat_good=tot_good,
+        sat_regular=tot_reg,
+        sat_bad=tot_bad,
     )
 
 
@@ -487,6 +510,7 @@ async def services_report(
             type=c.type,
             status=c.status,
             completion=c.completion,
+            satisfaction=c.satisfaction,
             work_performed=c.work_performed,
             operation_minutes=c.operation_minutes,
             opened_at=c.opened_at,

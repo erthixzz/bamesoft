@@ -10,6 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.router import api_router
 from app.core.audit_middleware import AuditMiddleware
 from app.core.config import settings
+from app.core.error_middleware import CatchAllErrorMiddleware
 from app.core.logging import configure_logging
 from app.db.session import dispose_engine
 
@@ -32,6 +33,17 @@ def create_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
 
+    # El orden importa: `add_middleware` inserta al frente, así que el ÚLTIMO
+    # añadido queda más externo. Queremos CORS como el más EXTERNO para que
+    # incluso las respuestas de error lleven cabeceras CORS.
+    # Ejecución (externo→interno): CORS → Auditoría → CatchAll → rutas.
+
+    # Convierte cualquier excepción no controlada en un 500 JSON (dentro de CORS).
+    app.add_middleware(CatchAllErrorMiddleware)
+
+    # Bitácora de auditoría (registra mutaciones exitosas con su actor).
+    app.add_middleware(AuditMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -41,9 +53,6 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-
-    # Bitácora de auditoría (registra mutaciones exitosas con su actor).
-    app.add_middleware(AuditMiddleware)
 
     app.include_router(api_router, prefix="/api/v1")
 

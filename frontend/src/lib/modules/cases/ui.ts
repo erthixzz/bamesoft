@@ -2,7 +2,13 @@
  *  Centraliza colores de "semáforo", opciones de selects y cálculos de
  *  edad / SLA para que dashboard, lista y detalle se vean coherentes.
  */
-import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+import type {
+  CaseCompletion,
+  CasePriority,
+  CaseSatisfaction,
+  CaseStatus,
+  CaseType,
+} from '$lib/api/types';
 import type { Case } from './types';
 
 export interface PriorityMeta {
@@ -43,6 +49,7 @@ export const TYPE_LABEL: Record<CaseType, string> = {
   calibration: 'Calibración',
   installation: 'Instalación',
   inspection: 'Inspección',
+  mishandling: 'Daño por mal manejo',
 };
 
 export const STATUS_OPTIONS = (Object.keys(STATUS_META) as CaseStatus[]).map((value) => ({
@@ -68,6 +75,36 @@ export const COMPLETION_LABEL: Record<CaseCompletion, string> = {
 export const COMPLETION_OPTIONS = (Object.keys(COMPLETION_LABEL) as CaseCompletion[]).map(
   (value) => ({ value, label: COMPLETION_LABEL[value] }),
 );
+
+// ---- Satisfacción del servicio (caritas) ----------------------------------
+
+export interface SatisfactionMeta {
+  label: string;
+  emoji: string; // carita para el PDF (sin dependencias de fuentes de iconos)
+  color: string; // hex del acento
+  tint: string; // fondo suave (tailwind class) para el botón activo
+  text: string; // texto (tailwind class)
+}
+
+export const SATISFACTION_META: Record<CaseSatisfaction, SatisfactionMeta> = {
+  bueno: { label: 'Bueno', emoji: '🙂', color: '#10b981', tint: 'bg-emerald-50', text: 'text-emerald-700' },
+  regular: { label: 'Regular', emoji: '😐', color: '#f59e0b', tint: 'bg-amber-50', text: 'text-amber-700' },
+  malo: { label: 'Malo', emoji: '☹️', color: '#ef4444', tint: 'bg-danger-50', text: 'text-danger-700' },
+};
+
+export const SATISFACTION_LABEL: Record<CaseSatisfaction, string> = {
+  bueno: SATISFACTION_META.bueno.label,
+  regular: SATISFACTION_META.regular.label,
+  malo: SATISFACTION_META.malo.label,
+};
+
+/** Orden bueno → regular → malo para el selector de caritas. */
+export const SATISFACTION_ORDER: CaseSatisfaction[] = ['bueno', 'regular', 'malo'];
+
+export const SATISFACTION_OPTIONS = SATISFACTION_ORDER.map((value) => ({
+  value,
+  label: SATISFACTION_META[value].label,
+}));
 
 /** Descripción corta de cada estado (para la leyenda "?"). */
 export const STATUS_DESCRIPTIONS: Record<CaseStatus, string> = {
@@ -203,6 +240,7 @@ const FIELD_LABEL: Record<string, string> = {
   priority: 'Prioridad',
   type: 'Tipo',
   completion: 'Estado final',
+  satisfaction: 'Satisfacción',
   operation_minutes: 'Tiempo de operación',
   work_performed: 'Actividad realizada',
   parts_count: 'N.º de repuestos',
@@ -226,6 +264,10 @@ function humanValue(key: string, raw: string): string {
   const v = raw.trim();
   if (key === 'status') return STATUS_META[v as CaseStatus]?.label ?? v;
   if (key === 'completion') return COMPLETION_LABEL[v as CaseCompletion] ?? v;
+  if (key === 'satisfaction') {
+    const m = SATISFACTION_META[v as CaseSatisfaction];
+    return m ? `${m.emoji} ${m.label}` : v;
+  }
   if (key === 'type') return TYPE_LABEL[v as CaseType] ?? v;
   if (key === 'priority') return PRIORITY_META[v as CasePriority]?.label ?? v;
   if (key === 'operation_minutes') return `${v} min`;

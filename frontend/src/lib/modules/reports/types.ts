@@ -36,6 +36,9 @@ export interface ProductivityRow {
   avg_work_hours: number | null;
   fcr_count: number;
   fcr_pct: number;
+  sat_good: number;
+  sat_regular: number;
+  sat_bad: number;
 }
 
 export interface ProductivityReport {
@@ -45,6 +48,9 @@ export interface ProductivityReport {
   incomplete: number;
   fcr_count: number;
   fcr_pct: number;
+  sat_good: number;
+  sat_regular: number;
+  sat_bad: number;
 }
 
 export interface DailyPoint {
@@ -101,6 +107,7 @@ export interface ServiceRow {
   type: string;
   status: string;
   completion: string | null;
+  satisfaction?: string | null;
   work_performed: string | null;
   operation_minutes: number | null;
   opened_at: string | null;

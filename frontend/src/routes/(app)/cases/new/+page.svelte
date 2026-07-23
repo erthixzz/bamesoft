@@ -18,6 +18,7 @@
   import type { Sector } from '$lib/modules/sectors/types';
   import type { User } from '$lib/modules/users/types';
   import type { CaseType, CasePriority } from '$lib/api/types';
+  import { TYPE_OPTIONS } from '$lib/modules/cases/ui';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
 
@@ -124,18 +125,7 @@
         <Input label="Título *" bind:value={form.title} required placeholder="Ventilador no enciende" />
         <Textarea label="Descripción" bind:value={form.description} rows={4} placeholder="Detalle del problema, contexto, antecedentes…" />
         <div class="grid gap-4 sm:grid-cols-2">
-          <Select
-            label="Tipo *"
-            bind:value={form.type}
-            required
-            options={[
-              { value: 'corrective', label: 'Correctivo' },
-              { value: 'preventive', label: 'Preventivo' },
-              { value: 'calibration', label: 'Calibración' },
-              { value: 'installation', label: 'Instalación' },
-              { value: 'inspection', label: 'Inspección' },
-            ]}
-          />
+          <Select label="Tipo *" bind:value={form.type} required options={TYPE_OPTIONS} />
           <Select
             label="Prioridad"
             bind:value={form.priority}

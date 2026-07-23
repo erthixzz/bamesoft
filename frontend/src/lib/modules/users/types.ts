@@ -8,6 +8,7 @@ export interface User {
   phone?: string | null;
   license_number?: string | null;
   avatar_url?: string | null;
+  cv_path?: string | null;
   active: boolean;
   clinic_id?: string | null;
   clinic_name?: string | null;

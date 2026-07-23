@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
+  import { FileText, Upload } from 'lucide-svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -20,6 +21,37 @@
 
   let clinics: Clinic[] = [];
   let saving = false;
+  let uploadingCv = false;
+  let hasCv = false;
+
+  $: hasCv = !!user.cv_path;
+
+  async function onCvFile(e: Event) {
+    const input = e.currentTarget as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+    uploadingCv = true;
+    try {
+      const updated = await usersApi.uploadCv(user.id, file);
+      user = updated;
+      dispatch('saved', updated);
+      toasts.success('Hoja de vida actualizada');
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : 'No se pudo subir la hoja de vida');
+    } finally {
+      uploadingCv = false;
+      input.value = '';
+    }
+  }
+
+  async function viewCv() {
+    try {
+      const { url } = await usersApi.cvUrl(user.id);
+      window.open(url, '_blank');
+    } catch (err) {
+      toasts.error(err instanceof Error ? err.message : 'No se pudo abrir la hoja de vida');
+    }
+  }
 
   let form = {
     full_name: '',
@@ -112,6 +144,31 @@
         { value: 'false', label: 'Inactivo' },
       ]}
     />
+    <div class="sm:col-span-2">
+      <span class="mb-1.5 block text-sm font-medium text-slate-600">Hoja de vida (CV)</span>
+      <div class="flex flex-wrap items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5">
+        <FileText class="h-5 w-5 shrink-0 {hasCv ? 'text-brand-600' : 'text-slate-400'}" />
+        {#if hasCv}
+          <button type="button" class="text-sm font-medium text-brand-600 hover:underline" on:click={viewCv}>
+            Ver hoja de vida actual
+          </button>
+        {:else}
+          <span class="text-sm text-slate-500">Sin hoja de vida adjunta</span>
+        {/if}
+        <label class="btn-secondary ml-auto inline-flex cursor-pointer items-center gap-2 text-sm {uploadingCv ? 'pointer-events-none opacity-60' : ''}">
+          <Upload class="h-4 w-4" />
+          {uploadingCv ? 'Subiendo…' : hasCv ? 'Reemplazar' : 'Adjuntar'}
+          <input
+            type="file"
+            class="hidden"
+            accept=".pdf,.doc,.docx,image/*"
+            on:change={onCvFile}
+            disabled={uploadingCv}
+          />
+        </label>
+      </div>
+    </div>
+
     <div class="sm:col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
       <span class="font-medium text-slate-600">Email:</span> {user.email}
       <span class="ml-2 text-slate-400">(no editable)</span>

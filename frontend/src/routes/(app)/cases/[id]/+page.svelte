@@ -55,6 +55,8 @@
     TYPE_OPTIONS,
     COMPLETION_LABEL,
     COMPLETION_OPTIONS,
+    SATISFACTION_ORDER,
+    SATISFACTION_META,
     STATUS_META,
     PRIORITY_META,
     elapsedBetween,
@@ -92,6 +94,7 @@
   let fPartsCount = '';
   let fPartsDetail = '';
   let fCompletion = '';
+  let fSatisfaction: '' | 'bueno' | 'regular' | 'malo' = '';
   let fReceiverName = '';
   let fReceiverDoc = '';
 
@@ -155,6 +158,7 @@
     fPartsCount = x.parts_count != null ? String(x.parts_count) : '';
     fPartsDetail = x.parts_detail ?? '';
     fCompletion = x.completion ?? '';
+    fSatisfaction = x.satisfaction ?? '';
     fReceiverName = x.receiver_name ?? '';
     fReceiverDoc = x.receiver_doc ?? '';
   }
@@ -271,6 +275,7 @@
     if (!fWork.trim()) e.fWork = 'Describe la actividad realizada';
     if (!fCompletion) e.fCompletion = 'Indica el estado final (completo/incompleto)';
     if (close) {
+      if (!fSatisfaction) e.fSatisfaction = 'Selecciona la satisfacción del servicio';
       if (!fReceiverName.trim()) e.fReceiverName = 'Nombre de quien recibe';
       if (!fReceiverDoc.trim()) e.fReceiverDoc = 'Documento de quien recibe';
       if (!hasSignature) e.signature = 'Captura la firma de quien recibe';
@@ -295,6 +300,7 @@
         parts_count: fPartsCount.trim() ? Number(fPartsCount) : null,
         parts_detail: fPartsDetail.trim() || null,
         completion: (fCompletion || null) as Case['completion'],
+        satisfaction: (fSatisfaction || null) as Case['satisfaction'],
         receiver_name: fReceiverName.trim() || null,
         receiver_doc: fReceiverDoc.trim() || null,
         signature_path,
@@ -352,6 +358,8 @@
       typeLabel: TYPE_LABEL[c.type],
       priorityLabel: PRIORITY_META[c.priority].label,
       completionLabel: c.completion ? COMPLETION_LABEL[c.completion] : '—',
+      satisfactionLabel: c.satisfaction ? SATISFACTION_META[c.satisfaction].label : '—',
+      satisfactionEmoji: c.satisfaction ? SATISFACTION_META[c.satisfaction].emoji : '',
       title: c.title,
       description: c.description ?? '—',
       equipmentLabel,
@@ -544,6 +552,32 @@
           </div>
 
           <h4 class="section-label mt-6 mb-2">Recibido a satisfacción</h4>
+
+          <div class="mb-4">
+            <span class="mb-1.5 block text-sm font-medium text-slate-600">
+              Satisfacción del servicio <span class="font-semibold text-danger-500">*</span>
+            </span>
+            <div class="grid grid-cols-3 gap-2 sm:max-w-md">
+              {#each SATISFACTION_ORDER as s (s)}
+                <button
+                  type="button"
+                  on:click={() => (fSatisfaction = fSatisfaction === s ? '' : s)}
+                  class="flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition
+                    {fSatisfaction === s
+                      ? `${SATISFACTION_META[s].tint} ${SATISFACTION_META[s].text} border-current shadow-sm`
+                      : 'border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'}"
+                  aria-pressed={fSatisfaction === s}
+                >
+                  <span class="text-2xl leading-none">{SATISFACTION_META[s].emoji}</span>
+                  <span class="text-xs font-semibold">{SATISFACTION_META[s].label}</span>
+                </button>
+              {/each}
+            </div>
+            {#if errors.fSatisfaction}
+              <p class="mt-1 text-xs text-danger-600">{errors.fSatisfaction}</p>
+            {/if}
+          </div>
+
           <div class="grid gap-3 sm:grid-cols-2">
             <Input label="Nombre de quien recibe" bind:value={fReceiverName} placeholder="Nombre completo" error={errors.fReceiverName} />
             <Input label="Documento / cédula" bind:value={fReceiverDoc} placeholder="C.C." error={errors.fReceiverDoc} />
@@ -670,6 +704,16 @@
       <Card title="Añadir nota" icon={MessageSquarePlus} accent="brand">
         <Input bind:value={newNote} placeholder="Escribe una nota…" />
         <div class="mt-3"><Button on:click={addNote}>Añadir</Button></div>
+      </Card>
+
+      <!-- Reincidencia: abrir un caso nuevo para el mismo equipo -->
+      <Card title="Reincidencia" icon={Wrench} accent="amber">
+        <p class="mb-3 text-sm text-slate-500">
+          ¿El equipo volvió a fallar? Registra un caso nuevo para este mismo equipo.
+        </p>
+        <a class="btn-secondary inline-flex w-full items-center justify-center gap-2" href={`/cases/new?equipment_id=${c.equipment_id}`}>
+          <PlusCircle class="h-4 w-4" /> Nuevo caso para este equipo
+        </a>
       </Card>
     </div>
   </div>

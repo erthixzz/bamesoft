@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFound
+from app.core.errors import BadRequest, NotFound
 from app.integrations import supabase as sb
 from app.modules.documents.models import Document
 from app.modules.documents.schemas import DocumentMeta
@@ -16,7 +16,7 @@ from app.modules.documents.schemas import DocumentMeta
 def _build_path(meta: DocumentMeta, filename: str) -> str:
     scope = meta.equipment_id or meta.case_id or meta.clinic_id or "global"
     ts = datetime.now(UTC).strftime("%Y%m%dT%H%M%S")
-    return f"{meta.type.value}/{scope}/{ts}_{filename}"
+    return f"{meta.type.value}/{scope}/{ts}_{sb.safe_filename(filename)}"
 
 
 async def upload(
@@ -29,7 +29,10 @@ async def upload(
     uploaded_by: uuid.UUID,
 ) -> Document:
     path = _build_path(meta, filename)
-    sb.upload_file(path, content, content_type=content_type)
+    try:
+        sb.upload_file(path, content, content_type=content_type)
+    except Exception as exc:  # error de Storage → mensaje legible (con CORS)
+        raise BadRequest(f"No se pudo subir el archivo: {exc}") from exc
 
     doc = Document(
         title=meta.title,

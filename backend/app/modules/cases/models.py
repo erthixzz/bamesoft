@@ -10,7 +10,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.db.enums import CaseCompletion, CasePriority, CaseStatus, CaseType
+from app.db.enums import CaseCompletion, CasePriority, CaseSatisfaction, CaseStatus, CaseType
 from app.db.mixins import Timestamps, UUIDPrimaryKey
 from app.db.types import pg_enum
 
@@ -70,6 +70,9 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     parts_detail: Mapped[str | None] = mapped_column(Text)
     completion: Mapped[CaseCompletion | None] = mapped_column(
         pg_enum(CaseCompletion, "case_completion")
+    )
+    satisfaction: Mapped[CaseSatisfaction | None] = mapped_column(
+        pg_enum(CaseSatisfaction, "case_satisfaction")
     )
     receiver_name: Mapped[str | None] = mapped_column(String(255))
     receiver_doc: Mapped[str | None] = mapped_column(String(64))
