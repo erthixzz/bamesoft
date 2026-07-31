@@ -3,11 +3,31 @@ name: backend
 on:
   push:
     branches: [main, dev]
-    paths: ['backend/**', '.github/workflows/backend.yml']
+    # `infra/supabase/**`: el gate de RLS (tests/test_rls_coverage.py) lee las
+    # migraciones SQL, así que una tabla nueva debe disparar el CI del backend.
+    paths: ['backend/**', 'infra/supabase/**', '.github/workflows/backend.yml']
   pull_request:
-    paths: ['backend/**', '.github/workflows/backend.yml']
+    paths: ['backend/**', 'infra/supabase/**', '.github/workflows/backend.yml']
 
 jobs:
+  # Gate de seguridad en job propio: un fallo de lint NO debe impedir que se
+  # verifique la exposición de tablas vía PostgREST. Candidato a "required
+  # status check" en la protección de rama.
+  rls-gate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - name: Toda tabla de `public` debe tener RLS
+        run: pytest tests/test_rls_coverage.py -q
+
   test:
     runs-on: ubuntu-latest
     defaults:
