@@ -1,4 +1,5 @@
 """Lógica y generación automática de alertas."""
+
 from __future__ import annotations
 
 import uuid
@@ -49,7 +50,9 @@ async def create(db: AsyncSession, payload: AlertCreate) -> Alert:
     return obj
 
 
-async def acknowledge(db: AsyncSession, alert_id: uuid.UUID, scope: uuid.UUID | None = None) -> Alert:
+async def acknowledge(
+    db: AsyncSession, alert_id: uuid.UUID, scope: uuid.UUID | None = None
+) -> Alert:
     obj = await _get_scoped(db, alert_id, scope)
     obj.acknowledged_at = datetime.now(UTC)
     await db.flush()

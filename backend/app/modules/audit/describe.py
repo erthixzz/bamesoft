@@ -54,11 +54,11 @@ def summarize_case(body: dict) -> list[str]:
     """Partes legibles de lo que cambió en un caso (sin tocar la BD).
     `assigned_to` y el código del caso los resuelve el middleware."""
     parts: list[str] = []
-    if "status" in body and body["status"]:
+    if body.get("status"):
         parts.append(f"estado → {STATUS_LABELS.get(body['status'], body['status'])}")
-    if "priority" in body and body["priority"]:
+    if body.get("priority"):
         parts.append(f"prioridad → {PRIORITY_LABELS.get(body['priority'], body['priority'])}")
-    if "completion" in body and body["completion"]:
+    if body.get("completion"):
         parts.append(f"servicio {COMPLETION_LABELS.get(body['completion'], body['completion'])}")
     if "sla_due_at" in body:
         parts.append("SLA definido" if body["sla_due_at"] else "SLA quitado")

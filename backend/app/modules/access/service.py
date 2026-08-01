@@ -1,4 +1,5 @@
 """Lógica de control de acceso (roles y features de compañía)."""
+
 from __future__ import annotations
 
 import uuid
@@ -9,7 +10,16 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.modules.access.models import ClinicFeature, RolePermission
 
 # Módulos que una compañía puede tener habilitados (deben coincidir con el frontend).
-FEATURES = ["dashboard", "equipment", "sectors", "cases", "alerts", "documents", "standards", "reports"]
+FEATURES = [
+    "dashboard",
+    "equipment",
+    "sectors",
+    "cases",
+    "alerts",
+    "documents",
+    "standards",
+    "reports",
+]
 
 
 async def get_role_matrix(db: AsyncSession) -> dict[str, dict[str, bool]]:
@@ -68,9 +78,7 @@ async def role_has_capability(db: AsyncSession, role: str, capability: str) -> b
     return bool(row is not None and row.enabled)
 
 
-async def feature_enabled(
-    db: AsyncSession, clinic_id: uuid.UUID | None, feature: str
-) -> bool:
+async def feature_enabled(db: AsyncSession, clinic_id: uuid.UUID | None, feature: str) -> bool:
     """¿La compañía tiene habilitado este módulo?
 
     Sin fila → habilitado (mismo criterio que `features_for_clinic`): las
@@ -83,17 +91,17 @@ async def feature_enabled(
     return True if row is None else bool(row.enabled)
 
 
-async def features_for_clinic(
-    db: AsyncSession, clinic_id: uuid.UUID | None
-) -> dict[str, bool]:
+async def features_for_clinic(db: AsyncSession, clinic_id: uuid.UUID | None) -> dict[str, bool]:
     """Features efectivas de una clínica. Sin fila en BD → habilitado por defecto.
     `clinic_id=None` (super admin) → todo habilitado."""
-    result = {f: True for f in FEATURES}
+    result = dict.fromkeys(FEATURES, True)
     if clinic_id is None:
         return result
     rows = (
-        await db.execute(select(ClinicFeature).where(ClinicFeature.clinic_id == clinic_id))
-    ).scalars().all()
+        (await db.execute(select(ClinicFeature).where(ClinicFeature.clinic_id == clinic_id)))
+        .scalars()
+        .all()
+    )
     for r in rows:
         result[r.feature] = r.enabled
     return result

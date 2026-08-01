@@ -1,4 +1,5 @@
 """Lógica de casos y bitácora."""
+
 from __future__ import annotations
 
 import secrets
@@ -57,9 +58,7 @@ async def get_case(db: AsyncSession, case_id: uuid.UUID, scope: uuid.UUID | None
     return obj
 
 
-async def get_case_by_code(
-    db: AsyncSession, code: str, scope: uuid.UUID | None = None
-) -> Case:
+async def get_case_by_code(db: AsyncSession, code: str, scope: uuid.UUID | None = None) -> Case:
     stmt = select(Case).where(Case.code == code)
     obj = (await db.execute(stmt)).scalar_one_or_none()
     if obj is None:
@@ -104,9 +103,7 @@ async def create_case(
     await db.flush()
 
     db.add(
-        CaseActivity(
-            case_id=obj.id, author_id=reporter_id, action="created", notes="Caso creado"
-        )
+        CaseActivity(case_id=obj.id, author_id=reporter_id, action="created", notes="Caso creado")
     )
     await db.flush()
     await db.refresh(obj)
@@ -135,14 +132,14 @@ async def update_case(
     # TODAS las estadísticas reflejen el estado actual y no datos "sellados"
     # de un cierre previo (p. ej. un caso en progreso no debe contar como
     # completo ni sumar al tiempo promedio de cierre).
-    _ACTIVE_AGAIN = {
+    active_again = {
         CaseStatus.OPEN,
         CaseStatus.ASSIGNED,
         CaseStatus.IN_PROGRESS,
         CaseStatus.WAITING_PARTS,
         CaseStatus.WAITING_CLIENT,
     }
-    if obj.status == CaseStatus.CLOSED and new_status in _ACTIVE_AGAIN:
+    if obj.status == CaseStatus.CLOSED and new_status in active_again:
         obj.closed_at = None
         obj.finished_at = None
         obj.completion = None
@@ -193,7 +190,10 @@ async def accept_case(
 
     db.add(
         CaseActivity(
-            case_id=obj.id, author_id=engineer_id, action="accepted", notes="Caso tomado por el ingeniero"
+            case_id=obj.id,
+            author_id=engineer_id,
+            action="accepted",
+            notes="Caso tomado por el ingeniero",
         )
     )
     await db.flush()

@@ -1,4 +1,5 @@
 """Reportes / KPIs."""
+
 from __future__ import annotations
 
 import uuid
@@ -61,22 +62,38 @@ def _hours(seconds: float | None) -> float | None:
 _DASHBOARD_SQL = text(
     """
     select
-      (select count(*) from equipment e where (:scope::uuid is null or e.clinic_id = :scope)) as eq_total,
-      (select count(*) from equipment e where e.status = 'operational' and (:scope::uuid is null or e.clinic_id = :scope)) as eq_op,
-      (select count(*) from equipment e where e.status = 'out_of_service' and (:scope::uuid is null or e.clinic_id = :scope)) as eq_oos,
+      (select count(*) from equipment e
+        where (:scope::uuid is null or e.clinic_id = :scope)) as eq_total,
+      (select count(*) from equipment e
+        where e.status = 'operational'
+          and (:scope::uuid is null or e.clinic_id = :scope)) as eq_op,
+      (select count(*) from equipment e
+        where e.status = 'out_of_service'
+          and (:scope::uuid is null or e.clinic_id = :scope)) as eq_oos,
       (select count(*) from cases c join equipment e on e.id = c.equipment_id
-        where c.status = 'open' and (:scope::uuid is null or e.clinic_id = :scope)) as cases_open,
+        where c.status = 'open'
+          and (:scope::uuid is null or e.clinic_id = :scope)) as cases_open,
       (select count(*) from cases c join equipment e on e.id = c.equipment_id
-        where c.status = 'in_progress' and (:scope::uuid is null or e.clinic_id = :scope)) as cases_ip,
+        where c.status = 'in_progress'
+          and (:scope::uuid is null or e.clinic_id = :scope)) as cases_ip,
       (select count(*) from cases c join equipment e on e.id = c.equipment_id
-        where c.status = 'closed' and c.closed_at >= :last_30 and (:scope::uuid is null or e.clinic_id = :scope)) as cases_closed_30,
+        where c.status = 'closed'
+          and c.closed_at >= :last_30
+          and (:scope::uuid is null or e.clinic_id = :scope)) as cases_closed_30,
       (select count(*) from maintenance_schedules ms join equipment e on e.id = ms.equipment_id
-        where ms.next_due_at is not null and ms.next_due_at <= :horizon and (:scope::uuid is null or e.clinic_id = :scope)) as pm_due,
+        where ms.next_due_at is not null
+          and ms.next_due_at <= :horizon
+          and (:scope::uuid is null or e.clinic_id = :scope)) as pm_due,
       (select count(*) from calibrations cal join equipment e on e.id = cal.equipment_id
-        where cal.expires_at is not null and cal.expires_at <= :horizon and (:scope::uuid is null or e.clinic_id = :scope)) as cal_due,
-      (select avg(extract(epoch from c.closed_at - c.opened_at)) from cases c join equipment e on e.id = c.equipment_id
-        where c.closed_at is not null and c.opened_at is not null and (:scope::uuid is null or e.clinic_id = :scope)) as avg_close_seconds
-    """
+        where cal.expires_at is not null
+          and cal.expires_at <= :horizon
+          and (:scope::uuid is null or e.clinic_id = :scope)) as cal_due,
+      (select avg(extract(epoch from c.closed_at - c.opened_at))
+         from cases c join equipment e on e.id = c.equipment_id
+        where c.closed_at is not null
+          and c.opened_at is not null
+          and (:scope::uuid is null or e.clinic_id = :scope)) as avg_close_seconds
+"""
 )
 
 
@@ -87,9 +104,7 @@ async def dashboard(db: AsyncSession, scope: uuid.UUID | None = None) -> Dashboa
 
     sp = str(scope) if scope is not None else None
     row = (
-        await db.execute(
-            _DASHBOARD_SQL, {"horizon": horizon, "last_30": last_30, "scope": sp}
-        )
+        await db.execute(_DASHBOARD_SQL, {"horizon": horizon, "last_30": last_30, "scope": sp})
     ).one()
 
     avg_seconds = row.avg_close_seconds
@@ -312,15 +327,9 @@ async def operations(
                     # Buckets por estado actual (dentro del rango) para que TODO
                     # caso reportado quede contabilizado y nada se "pierda":
                     # reportadas = en proceso + en espera + cerradas + anuladas.
-                    func.count()
-                    .filter(Case.status.in_(_ACTIVE))
-                    .label("active"),
-                    func.count()
-                    .filter(Case.status.in_(_WAITING))
-                    .label("waiting"),
-                    func.count()
-                    .filter(Case.status == CaseStatus.CANCELLED)
-                    .label("cancelled"),
+                    func.count().filter(Case.status.in_(_ACTIVE)).label("active"),
+                    func.count().filter(Case.status.in_(_WAITING)).label("waiting"),
+                    func.count().filter(Case.status == CaseStatus.CANCELLED).label("cancelled"),
                 ).where(*rng),
                 scope,
             )
@@ -336,7 +345,9 @@ async def operations(
     day = func.date(_opened_col())
     rep_rows = (
         await db.execute(
-            _scope_case(select(day.label("d"), func.count().label("n")).where(*rng), scope).group_by(day)
+            _scope_case(
+                select(day.label("d"), func.count().label("n")).where(*rng), scope
+            ).group_by(day)
         )
     ).all()
     # Cerrados por día (sobre la fecha de cierre, dentro del mismo rango).
@@ -348,7 +359,9 @@ async def operations(
         cl_conds.append(cday <= date_to)
     cl_rows = (
         await db.execute(
-            _scope_case(select(cday.label("d"), func.count().label("n")).where(*cl_conds), scope).group_by(cday)
+            _scope_case(
+                select(cday.label("d"), func.count().label("n")).where(*cl_conds), scope
+            ).group_by(cday)
         )
     ).all()
 
@@ -558,7 +571,9 @@ async def breakdown(
 
     # Tendencia mensual (YYYY-MM).
     month = func.to_char(_opened_col(), "YYYY-MM")
-    m_stmt = _scope_case(select(month, func.count()).where(*rng), scope).group_by(month).order_by(month)
+    m_stmt = (
+        _scope_case(select(month, func.count()).where(*rng), scope).group_by(month).order_by(month)
+    )
     monthly = [NamedCount(label=str(k), value=n) for k, n in (await db.execute(m_stmt)).all() if k]
 
     return BreakdownReport(

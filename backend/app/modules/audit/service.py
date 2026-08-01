@@ -2,8 +2,8 @@
 from __future__ import annotations
 
 import uuid
-from datetime import date, datetime
 from collections.abc import Sequence
+from datetime import date
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession

@@ -6,6 +6,7 @@ Nunca rompe la petición: cualquier fallo al auditar se ignora silenciosamente.
 """
 from __future__ import annotations
 
+import contextlib
 import json
 import uuid
 
@@ -45,10 +46,9 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 body_bytes = b""
 
         response = await call_next(request)
-        try:
+        # La auditoría jamás debe afectar la respuesta: si falla, se ignora.
+        with contextlib.suppress(Exception):
             await self._maybe_log(request, response.status_code, body_bytes)
-        except Exception:  # la auditoría jamás debe afectar la respuesta
-            pass
         return response
 
     async def _maybe_log(self, request: Request, status_code: int, body_bytes: bytes) -> None:

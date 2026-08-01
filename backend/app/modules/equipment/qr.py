@@ -1,4 +1,5 @@
 """Generación y parsing de QR para equipos."""
+
 from __future__ import annotations
 
 import io
@@ -68,7 +69,9 @@ def parse_payload(raw: str) -> tuple[str, str]:
     return code, token
 
 
-def _diagonal_gradient(size: tuple[int, int], c1: tuple[int, int, int], c2: tuple[int, int, int]) -> Image.Image:
+def _diagonal_gradient(
+    size: tuple[int, int], c1: tuple[int, int, int], c2: tuple[int, int, int]
+) -> Image.Image:
     """Genera un degradado diagonal de c1 (arriba-izq) a c2 (abajo-der)."""
     w, h = size
     grad = Image.new("RGB", size)
@@ -136,8 +139,12 @@ def _brand_badge(box: int) -> Image.Image:
 
     # Cruz médica (esmeralda) en el hueco superior.
     d = ImageDraw.Draw(img)
-    d.rounded_rectangle([gx(21.3), gx(15.7), gx(23.3), gx(21.3)], radius=int(0.9 * u), fill=_EMERALD)
-    d.rounded_rectangle([gx(19.5), gx(17.5), gx(25.1), gx(19.5)], radius=int(0.9 * u), fill=_EMERALD)
+    d.rounded_rectangle(
+        [gx(21.3), gx(15.7), gx(23.3), gx(21.3)], radius=int(0.9 * u), fill=_EMERALD
+    )
+    d.rounded_rectangle(
+        [gx(19.5), gx(17.5), gx(25.1), gx(19.5)], radius=int(0.9 * u), fill=_EMERALD
+    )
 
     return img.resize((box, box), Image.LANCZOS)
 

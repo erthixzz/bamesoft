@@ -11,7 +11,7 @@ from app.db.base import Base
 
 
 class RolePermission(Base):
-    """Qué puede *hacer* cada rol (matriz rol × capacidad). Global."""
+    """Qué puede *hacer* cada rol (matriz rol / capacidad). Global."""
 
     __tablename__ = "role_permissions"
 
@@ -21,7 +21,7 @@ class RolePermission(Base):
 
 
 class ClinicFeature(Base):
-    """Qué módulos puede *ver* cada compañía (matriz compañía × módulo)."""
+    """Qué módulos puede *ver* cada compañía (matriz compañía / módulo)."""
 
     __tablename__ = "clinic_features"
 
