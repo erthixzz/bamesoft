@@ -38,15 +38,19 @@ from app.modules.users.models import User
 
 TEST_DATABASE_URL = os.getenv("TEST_DATABASE_URL", "")
 
-# En CI la BD SIEMPRE debe estar: si faltara, estos tests se saltarían y el job
-# quedaría verde sin haber comprobado el aislamiento — el peor resultado
-# posible. En local sí se saltan, para no estorbar a quien no tenga Postgres.
-_IN_CI = os.getenv("CI", "").lower() in {"1", "true", "yes"}
+# Donde el aislamiento DEBE comprobarse (el job `security-gates`), un skip
+# dejaría el pipeline verde sin haber probado nada — el peor resultado posible.
+# Ese job declara `REQUIRE_TEST_DB=1` y aquí convertimos el skip en error.
+#
+# No se usa la variable `CI` para esto: GitHub la define en TODOS los jobs, y el
+# job `test` corre sin Postqres a propósito (sus pruebas no lo necesitan). Atarlo
+# a `CI` hacía fallar ese job por una base de datos que nunca debió pedir.
+_REQUIRE_DB = os.getenv("REQUIRE_TEST_DB", "").lower() in {"1", "true", "yes"}
 
-if _IN_CI and not TEST_DATABASE_URL:
+if _REQUIRE_DB and not TEST_DATABASE_URL:
     raise RuntimeError(
-        "TEST_DATABASE_URL no está definida en CI: los tests de aislamiento "
-        "multi-clínica no pueden saltarse en el pipeline."
+        "REQUIRE_TEST_DB está activo pero falta TEST_DATABASE_URL: los tests de "
+        "aislamiento multi-clínica no pueden saltarse en este job."
     )
 
 requires_db = pytest.mark.skipif(

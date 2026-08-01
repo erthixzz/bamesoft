@@ -39,6 +39,9 @@ jobs:
 
     env:
       TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/bamesoft_test
+      # Este job es el que garantiza el aislamiento: si la BD faltara, los tests
+      # se saltarían y quedaría verde sin probar nada. Con esto, falla en su lugar.
+      REQUIRE_TEST_DB: '1'
 
     steps:
       - uses: actions/checkout@v4
