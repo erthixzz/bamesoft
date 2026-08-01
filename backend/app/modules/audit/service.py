@@ -5,7 +5,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import date
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.modules.audit.models import AuditLog
@@ -39,24 +39,93 @@ def _range(date_from: date | None, date_to: date | None) -> list:
     return conds
 
 
+def _filters(
+    stmt,
+    *,
+    actor_id: uuid.UUID | None,
+    entity: str | None,
+    method: str | None,
+    q: str | None,
+):
+    """Filtros comunes al listado y al conteo, para que no se desincronicen."""
+    if actor_id:
+        stmt = stmt.where(AuditLog.actor_id == actor_id)
+    if entity:
+        stmt = stmt.where(AuditLog.entity == entity)
+    if method:
+        stmt = stmt.where(AuditLog.method == method.upper())
+    if q and q.strip():
+        # Búsqueda libre sobre lo que un admin recuerda: el nombre de quien lo
+        # hizo, la descripción de la acción o el código del registro tocado.
+        like = f"%{q.strip()}%"
+        stmt = stmt.where(
+            or_(
+                AuditLog.actor_name.ilike(like),
+                AuditLog.action.ilike(like),
+                AuditLog.detail.ilike(like),
+                AuditLog.entity_id.ilike(like),
+            )
+        )
+    return stmt
+
+
 async def list_logs(
     db: AsyncSession,
     *,
     scope: uuid.UUID | None = None,
     actor_id: uuid.UUID | None = None,
     entity: str | None = None,
+    method: str | None = None,
+    q: str | None = None,
     date_from: date | None = None,
     date_to: date | None = None,
     limit: int = 100,
     offset: int = 0,
 ) -> Sequence[AuditLog]:
     stmt = _scoped(select(AuditLog), scope).where(*_range(date_from, date_to))
-    if actor_id:
-        stmt = stmt.where(AuditLog.actor_id == actor_id)
-    if entity:
-        stmt = stmt.where(AuditLog.entity == entity)
+    stmt = _filters(stmt, actor_id=actor_id, entity=entity, method=method, q=q)
     stmt = stmt.order_by(AuditLog.created_at.desc()).limit(limit).offset(offset)
     return (await db.execute(stmt)).scalars().all()
+
+
+async def count_logs(
+    db: AsyncSession,
+    *,
+    scope: uuid.UUID | None = None,
+    actor_id: uuid.UUID | None = None,
+    entity: str | None = None,
+    method: str | None = None,
+    q: str | None = None,
+    date_from: date | None = None,
+    date_to: date | None = None,
+) -> int:
+    """Total que cumple el filtro, para saber si hay más de lo que se muestra."""
+    stmt = _scoped(select(func.count(AuditLog.id)), scope).where(
+        *_range(date_from, date_to)
+    )
+    stmt = _filters(stmt, actor_id=actor_id, entity=entity, method=method, q=q)
+    return (await db.execute(stmt)).scalar() or 0
+
+
+async def list_actors(
+    db: AsyncSession, *, scope: uuid.UUID | None = None
+) -> list[dict[str, str]]:
+    """Personas que aparecen en la bitácora, para el desplegable de filtro."""
+    stmt = _scoped(
+        select(AuditLog.actor_id, AuditLog.actor_name)
+        .where(AuditLog.actor_id.is_not(None))
+        .distinct(),
+        scope,
+    )
+    rows = (await db.execute(stmt)).all()
+    seen: dict[str, str] = {}
+    for actor_id, name in rows:
+        if actor_id is not None:
+            seen.setdefault(str(actor_id), name or "—")
+    return [
+        {"id": aid, "name": name}
+        for aid, name in sorted(seen.items(), key=lambda kv: kv[1].lower())
+    ]
 
 
 async def summary(

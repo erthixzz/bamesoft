@@ -41,8 +41,14 @@ infra/supabase/seed.local.sql
 Thumbs.db
 
 # --- Logs / tmp ---
+# Ojo con los patrones sin barra inicial: `logs/` coincide en CUALQUIER nivel y
+# llegó a ignorar `frontend/src/routes/(app)/logs/`, la página de bitácora, que
+# por eso nunca se desplegó. Se anclan a la raíz para que solo afecten a la
+# salida de ejecución.
 *.log
-logs/
+/logs/
+/backend/logs/
+/frontend/logs/
 tmp/
 .cache/
 

@@ -23,6 +23,26 @@ class AuditLogOut(BaseModel):
     created_at: datetime
 
 
+class AuditActor(BaseModel):
+    """Persona que aparece en la bitácora (para el desplegable de filtro)."""
+
+    id: str
+    name: str
+
+
+class AuditPage(BaseModel):
+    """Página de resultados con el total que cumple el filtro.
+
+    El total permite decirle al usuario «mostrando 100 de 1.240» en vez de
+    dejarle creer que eso es todo lo que hay.
+    """
+
+    items: list[AuditLogOut]
+    total: int
+    limit: int
+    offset: int
+
+
 class CountRow(BaseModel):
     key: str
     label: str

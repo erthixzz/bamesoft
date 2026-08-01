@@ -31,3 +31,17 @@ export interface AuditSummary {
   by_entity: CountRow[];
   by_day: DayCount[];
 }
+
+/** Persona que aparece en la bitácora (para el desplegable de filtro). */
+export interface AuditActor {
+  id: string;
+  name: string;
+}
+
+/** Página de bitácora con el total que cumple el filtro aplicado. */
+export interface AuditPage {
+  items: AuditLog[];
+  total: number;
+  limit: number;
+  offset: number;
+}
