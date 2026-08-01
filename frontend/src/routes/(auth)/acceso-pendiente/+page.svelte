@@ -2,10 +2,13 @@
   /**
    * Pantalla para quien se autenticó correctamente pero todavía no tiene acceso.
    *
-   * Es la contraparte visible del cierre del auto-alta en el backend: con el
-   * inicio de sesión por Google cualquiera puede *identificarse*, pero solo un
-   * administrador decide quién *entra* y a qué clínica. Sin esta página, esa
-   * persona vería un 403 crudo y pensaría que la app está rota.
+   * Es la contraparte visible del cierre del auto-alta en el backend: tener
+   * credenciales válidas ya no basta para entrar, porque el perfil lo crea un
+   * administrador. Sin esta página esa persona vería un 403 crudo y pensaría
+   * que la aplicación está rota.
+   *
+   * En la práctica ocurre con cuentas creadas a mano en Supabase o con el
+   * resto de un alta que falló a medias.
    */
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
@@ -88,9 +91,8 @@
     </h1>
 
     <p class="mx-auto mt-3 max-w-sm text-sm leading-relaxed text-slate-600">
-      Iniciaste sesión correctamente, pero en Bamesoft el acceso lo concede un
-      administrador de tu clínica. Es lo que impide que alguien ajeno entre solo
-      por tener una cuenta de Google.
+      Tus credenciales son válidas, pero tu cuenta todavía no está asignada a
+      ninguna clínica. En Bamesoft el acceso lo concede un administrador.
     </p>
 
     {#if email}
@@ -127,7 +129,7 @@
       </li>
       <li class="flex gap-3">
         <span class="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-500">3</span>
-        A partir de ahí entras con Google en un solo clic.
+        A partir de ahí entras con normalidad.
       </li>
     </ol>
 

@@ -10,7 +10,6 @@
   import PageHeader from '$lib/components/PageHeader.svelte';
   import EmptyState from '$lib/components/EmptyState.svelte';
   import Spinner from '$lib/components/Spinner.svelte';
-  import AccessRequestsCard from '$lib/modules/access/components/AccessRequestsCard.svelte';
   import UserEditModal from '$lib/modules/users/components/UserEditModal.svelte';
   import UserCreateModal from '$lib/modules/users/components/UserCreateModal.svelte';
   import { usersApi } from '$lib/modules/users/api';
@@ -129,11 +128,6 @@
     <Button on:click={() => (createOpen = true)}><PlusCircle class="h-4 w-4" /> Nuevo usuario</Button>
   </svelte:fragment>
 </PageHeader>
-
-<!-- Va arriba y solo aparece si hay algo pendiente: es lo que requiere acción. -->
-<div class="mb-4">
-  <AccessRequestsCard {clinics} on:approved={load} />
-</div>
 
 <Card>
   <div class="mb-4 max-w-md">

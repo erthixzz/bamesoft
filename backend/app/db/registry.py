@@ -7,7 +7,6 @@ from __future__ import annotations
 
 from app.db.base import Base  # noqa: F401
 from app.modules.access.models import ClinicFeature, RolePermission  # noqa: F401
-from app.modules.access.requests_models import AccessRequest  # noqa: F401
 from app.modules.alerts.models import Alert  # noqa: F401
 from app.modules.audit.models import AuditLog  # noqa: F401
 from app.modules.calibrations.models import Calibration  # noqa: F401

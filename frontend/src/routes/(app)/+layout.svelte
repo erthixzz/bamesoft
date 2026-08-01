@@ -81,7 +81,7 @@
         profile.set(p);
       } catch (e) {
         // Autenticado pero sin perfil: no es un error, es que un administrador
-        // todavía no le ha dado acceso (típico al entrar con Google).
+        // todavía no le ha asignado una clínica.
         if (e instanceof Error && e.message.includes('SIN_PERFIL')) {
           goto('/acceso-pendiente');
           return;

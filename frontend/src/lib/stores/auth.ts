@@ -58,33 +58,6 @@ export async function login(
   if (data.session) session.set(data.session);
 }
 
-/**
- * Inicia sesión con Google (OAuth).
- *
- * No lleva `captchaToken`: la protección CAPTCHA de Supabase aplica a los
- * formularios de email/contraseña, no al flujo OAuth — ahí la verificación
- * anti-bot la hace el propio Google.
- *
- * Autenticarse NO implica tener acceso: si la cuenta no está dada de alta en
- * Bamesoft, la API responde 403 y el usuario acaba en `/acceso-pendiente`.
- */
-export async function loginWithGoogle(next?: string): Promise<void> {
-  const redirectTo =
-    typeof window !== 'undefined'
-      ? `${window.location.origin}${next && next.startsWith('/') ? next : '/dashboard'}`
-      : undefined;
-
-  const { error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      queryParams: { prompt: 'select_account' },
-    },
-  });
-  if (error) throw error;
-  // No hay nada más que hacer: el navegador se va a Google.
-}
-
 export async function logout(): Promise<void> {
   await supabase.auth.signOut();
   profile.set(null);
