@@ -18,7 +18,7 @@ aislamiento por clínica lo cubre `test_tenant_isolation.py`.
 """
 from __future__ import annotations
 
-from fastapi.routing import APIRoute
+from typing import Any
 
 from app.main import create_app
 
@@ -30,18 +30,51 @@ EXEMPT_PATHS: dict[str, str] = {
 }
 
 
-def _mutating_routes() -> list[APIRoute]:
+def _iter_endpoints(routes: list[Any]) -> list[Any]:
+    """Endpoints con `.path`, `.methods` y `.dependant`, sea cual sea la versión.
+
+    FastAPI cambió cómo expone las rutas incluidas:
+
+    - hasta ~0.136, `app.include_router()` aplanaba todo en `app.routes` como
+      objetos `APIRoute`;
+    - desde ~0.141 mete un único `_IncludedRouter` y las rutas resueltas viven
+      en su `effective_route_contexts`.
+
+    Buscar solo `APIRoute` en `app.routes` devolvía CERO en la versión nueva, y
+    el gate habría pasado en vacío. Por eso aquí no se comprueba el tipo sino la
+    forma (duck typing) y se baja por cualquier anidamiento.
+    """
+    found: list[Any] = []
+    for route in routes:
+        contexts = getattr(route, "effective_route_contexts", None)
+        if contexts is not None:
+            # Según la versión es un atributo o un método sin argumentos.
+            if callable(contexts):
+                contexts = contexts()
+            found.extend(_iter_endpoints(list(contexts)))
+            continue
+        nested = getattr(route, "routes", None)
+        if nested:
+            found.extend(_iter_endpoints(list(nested)))
+            continue
+        # Un endpoint de FastAPI: tiene árbol de dependencias y métodos HTTP.
+        # Las rutas sueltas de Starlette (/docs, /openapi.json) no tienen
+        # `dependant` y quedan fuera.
+        if getattr(route, "dependant", None) is not None and getattr(route, "methods", None):
+            found.append(route)
+    return found
+
+
+def _mutating_routes() -> list[Any]:
     app = create_app()
     return [
         r
-        for r in app.routes
-        if isinstance(r, APIRoute)
-        and (r.methods or set()) & MUTATING
-        and r.path not in EXEMPT_PATHS
+        for r in _iter_endpoints(list(app.routes))
+        if (r.methods or set()) & MUTATING and r.path not in EXEMPT_PATHS
     ]
 
 
-def _dependency_calls(route: APIRoute) -> list[object]:
+def _dependency_calls(route: Any) -> list[object]:
     """Todas las funciones-dependencia del árbol de la ruta (recursivo)."""
     found: list[object] = []
     pending = list(route.dependant.dependencies)
