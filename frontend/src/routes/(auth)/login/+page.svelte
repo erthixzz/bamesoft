@@ -6,7 +6,9 @@
   import Button from '$lib/components/Button.svelte';
   import Input from '$lib/components/Input.svelte';
   import BrandMark from '$lib/components/BrandMark.svelte';
-  import { login } from '$lib/stores/auth';
+  import Turnstile from '$lib/components/Turnstile.svelte';
+  import GoogleMark from '$lib/components/GoogleMark.svelte';
+  import { login, loginWithGoogle } from '$lib/stores/auth';
   import { toasts } from '$lib/stores/toasts';
   import { ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-svelte';
 
@@ -14,6 +16,23 @@
   let password = '';
   let loading = false;
   let error: string | null = null;
+
+  /** Verificación anti-bot. `captcha.required` es false si no hay sitekey. */
+  let captchaToken: string | null = null;
+  let captcha: Turnstile;
+  let googleLoading = false;
+
+  async function onGoogle() {
+    googleLoading = true;
+    error = null;
+    try {
+      await loginWithGoogle($page.url.searchParams.get('next') ?? undefined);
+      // Si todo va bien el navegador ya se fue a Google; no se llega aquí.
+    } catch (e) {
+      error = e instanceof Error ? e.message : 'No se pudo conectar con Google';
+      googleLoading = false;
+    }
+  }
 
   /** Solo se permite redirigir a rutas internas (evita open-redirect). */
   function safeNext(): string {
@@ -26,11 +45,14 @@
     loading = true;
     error = null;
     try {
-      await login(email, password);
+      await login(email, password, captchaToken);
       toasts.success('¡Bienvenido!');
       goto(safeNext());
     } catch (e) {
       error = e instanceof Error ? e.message : 'Error al iniciar sesión';
+      // El token de Turnstile es de un solo uso: sin esto, el segundo intento
+      // fallaría siempre aunque la contraseña fuese correcta.
+      captcha?.reset();
     } finally {
       loading = false;
     }
@@ -111,17 +133,38 @@
         </div>
       </header>
 
+      <!-- Google primero: para quien ya tiene acceso es un solo clic -->
+      <button
+        type="button"
+        on:click={onGoogle}
+        disabled={googleLoading || loading}
+        class="flex w-full items-center justify-center gap-2.5 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-slate-300 hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <GoogleMark />
+        {googleLoading ? 'Conectando con Google…' : 'Continuar con Google'}
+      </button>
+
+      <div class="my-4 flex items-center gap-3">
+        <span class="h-px flex-1 bg-slate-200"></span>
+        <span class="text-[11px] font-medium uppercase tracking-wider text-slate-400">
+          o con tu correo
+        </span>
+        <span class="h-px flex-1 bg-slate-200"></span>
+      </div>
+
       <div class="space-y-3">
         <Input label="Email" type="email" bind:value={email} required placeholder="tu@clinica.com" />
         <Input label="Contraseña" type="password" bind:value={password} required placeholder="••••••••" />
       </div>
+
+      <Turnstile bind:this={captcha} bind:token={captchaToken} />
 
       {#if error}
         <p class="mt-3 rounded-lg bg-red-50 px-3 py-2 text-xs text-danger-700">{error}</p>
       {/if}
 
       <div class="mt-6">
-        <Button type="submit" {loading}>
+        <Button type="submit" {loading} disabled={captcha?.required && !captchaToken}>
           <span class="flex items-center gap-2">
             Entrar
             <ArrowRight class="h-4 w-4" />

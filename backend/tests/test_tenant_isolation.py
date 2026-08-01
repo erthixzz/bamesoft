@@ -237,3 +237,65 @@ async def test_cliente_no_puede_cerrar_casos(
         assert creado.status_code == 201, creado.text  # reportar sí puede
         r = await c.patch(f"/api/v1/cases/{creado.json()['id']}", json={"status": "closed"})
     assert r.status_code == 403, f"Un cliente cerró un caso: {r.status_code} {r.text[:200]}"
+
+
+# --- Autenticado ≠ autorizado ---------------------------------------------
+
+async def test_token_valido_sin_perfil_no_crea_usuario(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    """La garantía que sostiene el login con Google.
+
+    Cualquiera puede autenticarse ante Google y conseguir un token válido de
+    Supabase. Antes, el backend le creaba el perfil solo y esa persona quedaba
+    dentro de Bamesoft. Ahora debe rechazarse: el alta la hace un admin.
+
+    Se simula un token ya verificado (sustituyendo `decode_token`) para probar
+    exactamente el paso siguiente: qué ocurre cuando el usuario no existe aquí.
+    """
+    from sqlalchemy import select
+
+    from app.core.errors import NO_PROFILE_CODE, Forbidden
+    from app.modules.auth import deps
+    from app.modules.users.models import User
+
+    intruso = uuid.uuid4()
+    monkeypatch.setattr(
+        deps,
+        "decode_token",
+        lambda _token: {"sub": str(intruso), "email": "cualquiera@gmail.com"},
+    )
+
+    async with db_sessionmaker() as s:
+        with pytest.raises(Forbidden) as exc_info:
+            await deps._user_from_token("Bearer token-de-google", s)
+        await s.commit()
+
+    detalle = str(getattr(exc_info.value, "detail", exc_info.value))
+    assert NO_PROFILE_CODE in detalle, f"El 403 no lleva la marca que espera el frontend: {detalle}"
+    assert getattr(exc_info.value, "status_code", None) == 403
+
+    async with db_sessionmaker() as s:
+        creado = (
+            await s.execute(select(User).where(User.id == intruso))
+        ).scalar_one_or_none()
+    assert creado is None, "Se creó un perfil automáticamente para un desconocido"
+
+
+async def test_usuario_con_perfil_si_entra(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    """Contraparte: con perfil dado de alta por un admin, el mismo flujo pasa."""
+    from app.modules.auth import deps
+
+    a, _ = tenants
+    legitimo = a.user("engineer")
+    monkeypatch.setattr(
+        deps, "decode_token", lambda _t: {"sub": str(legitimo.id), "email": legitimo.email}
+    )
+
+    async with db_sessionmaker() as s:
+        user = await deps._user_from_token("Bearer token-de-google", s)
+        await s.commit()
+
+    assert user.id == legitimo.id

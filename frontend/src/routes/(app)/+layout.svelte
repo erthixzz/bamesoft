@@ -80,7 +80,13 @@
         const p = await authApi.whoami();
         profile.set(p);
       } catch (e) {
-        // No redirigir: muestra el error para depurar (CORS, 401, etc.)
+        // Autenticado pero sin perfil: no es un error, es que un administrador
+        // todavía no le ha dado acceso (típico al entrar con Google).
+        if (e instanceof Error && e.message.includes('SIN_PERFIL')) {
+          goto('/acceso-pendiente');
+          return;
+        }
+        // El resto sí son errores reales: se muestran para depurar (CORS, 401…).
         bootError = e instanceof Error ? e.message : 'Error desconocido';
       }
     }

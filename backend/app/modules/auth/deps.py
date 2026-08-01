@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from fastapi import Depends, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import Forbidden, Unauthorized
+from app.core.errors import Forbidden, NoProfile, Unauthorized
 from app.core.security import TokenError, decode_token
 from app.db.enums import UserRole
 from app.db.session import get_session
@@ -36,13 +36,14 @@ async def _user_from_token(authorization: str | None, db: AsyncSession) -> User:
 
     user = await db.get(User, user_id)
     if user is None:
-        # primer login post-Supabase: crear perfil mínimo
-        email = claims.get("email") or ""
-        full_name = claims.get("user_metadata", {}).get("full_name") or email.split("@")[0]
-        user = User(id=user_id, email=email, full_name=full_name, role=UserRole.CLIENT)
-        db.add(user)
-        await db.flush()
-        await db.refresh(user)
+        # Antes se creaba aquí un perfil CLIENT automáticamente. Con el inicio de
+        # sesión por Google eso significaba que CUALQUIERA con una cuenta de
+        # Google se convertía en usuario de Bamesoft con solo entrar.
+        #
+        # Autenticarse (demostrar quién eres ante Google o Supabase) y estar
+        # autorizado (existir en Bamesoft, dentro de una clínica) son cosas
+        # distintas. El alta la hace un administrador desde /users.
+        raise NoProfile()
 
     if not user.active:
         raise Forbidden("Usuario desactivado")

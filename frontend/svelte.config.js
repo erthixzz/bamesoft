@@ -19,11 +19,17 @@ const supabaseOrigin = origin(process.env.PUBLIC_SUPABASE_URL);
 // Supabase Realtime usa WebSocket sobre el mismo host.
 const supabaseWs = supabaseOrigin ? supabaseOrigin.replace(/^https:/, 'wss:') : null;
 
+// Cloudflare Turnstile (verificación anti-bot del login). Necesita tres cosas:
+// cargar su script, abrir un iframe con el reto y hablar con su servidor.
+// Omitir cualquiera de las tres deja el login inutilizable.
+const TURNSTILE = 'https://challenges.cloudflare.com';
+
 const connectSrc = [
   'self',
   apiOrigin,
   supabaseOrigin,
   supabaseWs,
+  TURNSTILE,
   // Red de seguridad para previews donde las variables aún no están fijadas.
   'https://*.supabase.co',
   'wss://*.supabase.co',
@@ -67,7 +73,10 @@ const config = {
       mode: 'auto',
       directives: {
         'default-src': ['self'],
-        'script-src': ['self'],
+        'script-src': ['self', TURNSTILE],
+        // El reto de Turnstile se dibuja dentro de un iframe suyo. Sin esta
+        // directiva heredaría `default-src 'self'` y no se vería nada.
+        'frame-src': [TURNSTILE],
         // Google Fonts (hoja de estilos) + estilos inline de Svelte/Tailwind.
         'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
         'font-src': ['self', 'data:', 'https://fonts.gstatic.com'],

@@ -14,6 +14,26 @@ class Forbidden(HTTPException):
         super().__init__(status.HTTP_403_FORBIDDEN, msg)
 
 
+# Marca que el frontend busca en el detalle del 403 para llevar al usuario a la
+# pantalla de "acceso pendiente" en vez de mostrarle un error genérico.
+NO_PROFILE_CODE = "SIN_PERFIL"
+
+
+class NoProfile(Forbidden):
+    """Se autenticó correctamente, pero nadie le ha dado acceso todavía.
+
+    Ocurre sobre todo con inicio de sesión por Google: cualquiera puede
+    autenticarse ante Google, pero solo un administrador de Bamesoft decide
+    quién existe como usuario y en qué clínica.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(
+            f"{NO_PROFILE_CODE}: tu cuenta aún no tiene acceso. "
+            "Un administrador debe habilitarte en una clínica."
+        )
+
+
 class Unauthorized(HTTPException):
     def __init__(self, msg: str = "Credenciales inválidas") -> None:
         super().__init__(status.HTTP_401_UNAUTHORIZED, msg)
