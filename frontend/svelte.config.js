@@ -29,6 +29,20 @@ const connectSrc = [
   'wss://*.supabase.co',
 ].filter(Boolean);
 
+// La API sirve imágenes, no solo JSON: el PNG del QR de cada equipo se carga
+// con <img src="{API}/public/equipment/{code}/qr.png">. Sin este origen en
+// `img-src` el navegador lo bloquea y el QR sale roto.
+const imgSrc = [
+  'self',
+  'data:',
+  // PDFs y descargas generadas en el cliente.
+  'blob:',
+  apiOrigin,
+  supabaseOrigin,
+  // URLs firmadas de fotos y documentos.
+  'https://*.supabase.co',
+].filter(Boolean);
+
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
   preprocess: vitePreprocess(),
@@ -57,9 +71,7 @@ const config = {
         // Google Fonts (hoja de estilos) + estilos inline de Svelte/Tailwind.
         'style-src': ['self', 'unsafe-inline', 'https://fonts.googleapis.com'],
         'font-src': ['self', 'data:', 'https://fonts.gstatic.com'],
-        // `blob:` para los PDF generados en cliente; Supabase para las URLs
-        // firmadas de fotos y documentos.
-        'img-src': ['self', 'data:', 'blob:', 'https://*.supabase.co'],
+        'img-src': imgSrc,
         'connect-src': connectSrc,
         'object-src': ['none'],
         'base-uri': ['self'],
