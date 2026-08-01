@@ -16,6 +16,7 @@ import uuid
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from app.core.errors import Forbidden
 from app.db.session import get_session
 from app.main import create_app
 from app.modules.auth.deps import require_authenticated
@@ -255,7 +256,7 @@ async def test_token_valido_sin_perfil_no_crea_usuario(
     """
     from sqlalchemy import select
 
-    from app.core.errors import NO_PROFILE_CODE, Forbidden
+    from app.core.errors import NO_PROFILE_CODE
     from app.modules.auth import deps
     from app.modules.users.models import User
 
@@ -299,3 +300,143 @@ async def test_usuario_con_perfil_si_entra(
         await s.commit()
 
     assert user.id == legitimo.id
+
+
+# --- Bandeja de solicitudes de acceso --------------------------------------
+
+async def test_intento_sin_perfil_queda_como_solicitud(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    """El rechazo debe dejar rastro: si no, el admin nunca se entera."""
+    from app.modules.access.requests_models import AccessRequest
+    from app.modules.auth import deps
+
+    intruso = uuid.uuid4()
+    claims = {
+        "sub": str(intruso),
+        "email": "nuevo@clinica-a.com",
+        "user_metadata": {"full_name": "Persona Nueva"},
+        "app_metadata": {"provider": "google"},
+    }
+    monkeypatch.setattr(deps, "decode_token", lambda _t: claims)
+    # `record_attempt` abre su propia sesión: la apuntamos a la BD de pruebas.
+    monkeypatch.setattr(
+        "app.modules.access.requests_service.AsyncSessionLocal", db_sessionmaker
+    )
+
+    async with db_sessionmaker() as s:
+        with pytest.raises(Forbidden):
+            await deps._user_from_token("Bearer x", s)
+
+    async with db_sessionmaker() as s:
+        req = await s.get(AccessRequest, intruso)
+    assert req is not None, "El intento no quedó registrado como solicitud"
+    assert req.status == "pending"
+    assert req.email == "nuevo@clinica-a.com"
+    assert req.full_name == "Persona Nueva"
+    assert req.provider == "google"
+
+
+async def test_reintentos_no_duplican_la_solicitud(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    from sqlalchemy import func, select
+
+    from app.modules.access.requests_models import AccessRequest
+    from app.modules.auth import deps
+
+    intruso = uuid.uuid4()
+    monkeypatch.setattr(
+        deps, "decode_token", lambda _t: {"sub": str(intruso), "email": "insiste@x.com"}
+    )
+    monkeypatch.setattr(
+        "app.modules.access.requests_service.AsyncSessionLocal", db_sessionmaker
+    )
+
+    for _ in range(3):
+        async with db_sessionmaker() as s:
+            with pytest.raises(Forbidden):
+                await deps._user_from_token("Bearer x", s)
+
+    async with db_sessionmaker() as s:
+        total = (await s.execute(select(func.count(AccessRequest.user_id)))).scalar()
+        req = await s.get(AccessRequest, intruso)
+    assert total == 1, f"Se crearon {total} filas en vez de una"
+    assert req.attempts == 3
+
+
+async def test_aprobar_solicitud_da_acceso_con_la_sesion_existente(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    """Lo que hace útil la bandeja: tras aprobar, la MISMA sesión ya entra."""
+    from app.db.enums import UserRole
+    from app.modules.access import requests_service
+    from app.modules.auth import deps
+
+    a, _ = tenants
+    persona = uuid.uuid4()
+    monkeypatch.setattr(
+        deps, "decode_token", lambda _t: {"sub": str(persona), "email": "futuro@clinica-a.com"}
+    )
+    monkeypatch.setattr(
+        "app.modules.access.requests_service.AsyncSessionLocal", db_sessionmaker
+    )
+
+    async with db_sessionmaker() as s:
+        with pytest.raises(Forbidden):
+            await deps._user_from_token("Bearer x", s)
+
+    async with db_sessionmaker() as s:
+        await requests_service.approve(
+            s,
+            persona,
+            clinic_id=a.clinic.id,
+            role=UserRole.ENGINEER,
+            resolved_by=a.user("clinic_admin").id,
+        )
+        await s.commit()
+
+    # El mismo token que antes fallaba ahora debe funcionar.
+    async with db_sessionmaker() as s:
+        user = await deps._user_from_token("Bearer x", s)
+        await s.commit()
+
+    assert user.id == persona
+    assert user.clinic_id == a.clinic.id
+    assert user.role == UserRole.ENGINEER
+
+
+async def test_solicitud_rechazada_no_vuelve_a_pendiente(
+    db_sessionmaker, tenants: tuple[Tenant, Tenant], monkeypatch
+) -> None:
+    """Descartar a alguien debe ser efectivo: no puede reaparecer en la bandeja."""
+    from app.modules.access import requests_service
+    from app.modules.access.requests_models import AccessRequest
+    from app.modules.auth import deps
+
+    a, _ = tenants
+    molesto = uuid.uuid4()
+    monkeypatch.setattr(
+        deps, "decode_token", lambda _t: {"sub": str(molesto), "email": "spam@x.com"}
+    )
+    monkeypatch.setattr(
+        "app.modules.access.requests_service.AsyncSessionLocal", db_sessionmaker
+    )
+
+    async with db_sessionmaker() as s:
+        with pytest.raises(Forbidden):
+            await deps._user_from_token("Bearer x", s)
+
+    async with db_sessionmaker() as s:
+        await requests_service.reject(
+            s, molesto, resolved_by=a.user("clinic_admin").id, note="No es de la clínica"
+        )
+        await s.commit()
+
+    async with db_sessionmaker() as s:  # insiste
+        with pytest.raises(Forbidden):
+            await deps._user_from_token("Bearer x", s)
+
+    async with db_sessionmaker() as s:
+        req = await s.get(AccessRequest, molesto)
+    assert req.status == "rejected", "Un reintento resucitó una solicitud rechazada"

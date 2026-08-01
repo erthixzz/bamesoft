@@ -11,6 +11,7 @@ from app.core.errors import Forbidden, NoProfile, Unauthorized
 from app.core.security import TokenError, decode_token
 from app.db.enums import UserRole
 from app.db.session import get_session
+from app.modules.access import requests_service
 from app.modules.access import service as access_service
 from app.modules.users.models import User
 
@@ -43,6 +44,11 @@ async def _user_from_token(authorization: str | None, db: AsyncSession) -> User:
         # Autenticarse (demostrar quién eres ante Google o Supabase) y estar
         # autorizado (existir en Bamesoft, dentro de una clínica) son cosas
         # distintas. El alta la hace un administrador desde /users.
+        #
+        # Antes de cerrar la puerta, dejamos la solicitud en la bandeja del
+        # admin: si no, esta persona tendría que escribirle por fuera y no
+        # quedaría rastro de que intentó entrar.
+        await requests_service.record_attempt(claims)
         raise NoProfile()
 
     if not user.active:
