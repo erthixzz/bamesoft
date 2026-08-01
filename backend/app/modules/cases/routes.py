@@ -8,7 +8,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import CaseStatus
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_authenticated, require_engineer
+from app.modules.auth.deps import (
+    assert_capability,
+    clinic_scope,
+    require_authenticated,
+    require_engineer,
+    requires,
+)
 from app.modules.cases import service
 from app.modules.cases.schemas import (
     CaseActivityIn,
@@ -45,7 +51,12 @@ async def list_cases(
     )
 
 
-@router.post("", response_model=CaseOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=CaseOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("report", "cases"))],
+)
 async def create_case(
     payload: CaseCreate,
     db: AsyncSession = Depends(get_session),
@@ -72,17 +83,29 @@ async def get_case(
     return await service.get_case(db, case_id, clinic_scope(current))
 
 
-@router.patch("/{case_id}", response_model=CaseOut)
+@router.patch(
+    "/{case_id}",
+    response_model=CaseOut,
+    dependencies=[Depends(requires("work", "cases"))],
+)
 async def update_case(
     case_id: uuid.UUID,
     payload: CaseUpdate,
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_engineer),
 ):
+    # Cerrar (o cancelar) es una acción aparte de "trabajar" el caso: se rige por
+    # la capacidad `close`, que el admin puede revocar sin quitar `work`.
+    if payload.status in (CaseStatus.CLOSED, CaseStatus.CANCELLED):
+        await assert_capability(db, current, "close", "cases")
     return await service.update_case(db, case_id, payload, current.id, clinic_scope(current))
 
 
-@router.post("/{case_id}/accept", response_model=CaseOut)
+@router.post(
+    "/{case_id}/accept",
+    response_model=CaseOut,
+    dependencies=[Depends(requires("work", "cases"))],
+)
 async def accept_case(
     case_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
@@ -104,6 +127,7 @@ async def list_activities(
     "/{case_id}/activities",
     response_model=CaseActivityOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("report", "cases"))],
 )
 async def add_activity(
     case_id: uuid.UUID,

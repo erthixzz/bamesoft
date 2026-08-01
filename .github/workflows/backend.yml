@@ -10,14 +10,36 @@ on:
     paths: ['backend/**', 'infra/supabase/**', '.github/workflows/backend.yml']
 
 jobs:
-  # Gate de seguridad en job propio: un fallo de lint NO debe impedir que se
-  # verifique la exposición de tablas vía PostgREST. Candidato a "required
-  # status check" en la protección de rama.
-  rls-gate:
+  # Gates de seguridad en un job propio: un fallo de lint NO debe impedir que se
+  # verifiquen. Candidatos a "required status check" en la protección de rama.
+  #
+  #   1. RLS      — ninguna tabla de `public` expuesta vía PostgREST.
+  #   2. AuthZ    — ninguna mutación sin guard de rol + capacidad.
+  #   3. Tenant   — la clínica A no puede leer ni escribir datos de la B.
+  security-gates:
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
+
+    # Postgres real: el aislamiento por clínica se decide en SQL y un mock no
+    # probaría nada. El esquema se crea desde los modelos (ver conftest_db.py).
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: bamesoft_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      TEST_DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/bamesoft_test
+
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -25,8 +47,18 @@ jobs:
           python-version: '3.11'
           cache: pip
       - run: pip install -e ".[dev]"
-      - name: Toda tabla de `public` debe tener RLS
+
+      - name: RLS — toda tabla de `public` protegida
         run: pytest tests/test_rls_coverage.py -q
+
+      - name: AuthZ — toda mutación con guard de rol y capacidad
+        run: pytest tests/test_authz_coverage.py -q
+
+      # Si TEST_DATABASE_URL faltara, estos tests se saltarían y el job quedaría
+      # verde sin haber probado nada. `conftest_db.py` lo convierte en error
+      # cuando detecta CI=true (variable que GitHub Actions define siempre).
+      - name: Aislamiento — la clínica A no ve ni toca la B
+        run: pytest tests/test_tenant_isolation.py -q
 
   test:
     runs-on: ubuntu-latest

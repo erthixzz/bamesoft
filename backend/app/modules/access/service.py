@@ -57,6 +57,32 @@ async def save_clinic_features(
     return await get_clinic_features(db)
 
 
+async def role_has_capability(db: AsyncSession, role: str, capability: str) -> bool:
+    """¿La matriz Roles habilita esta capacidad para este rol?
+
+    Fail-closed: si no existe la fila, se deniega. La migración 0007 siembra la
+    matriz completa, así que una fila ausente significa "capacidad nueva sin
+    decidir", y lo seguro es negarla hasta que un admin la habilite.
+    """
+    row = await db.get(RolePermission, (role, capability))
+    return bool(row is not None and row.enabled)
+
+
+async def feature_enabled(
+    db: AsyncSession, clinic_id: uuid.UUID | None, feature: str
+) -> bool:
+    """¿La compañía tiene habilitado este módulo?
+
+    Sin fila → habilitado (mismo criterio que `features_for_clinic`): las
+    clínicas nuevas arrancan con todo activo y el admin va apagando.
+    `clinic_id=None` (super admin) → siempre habilitado.
+    """
+    if clinic_id is None:
+        return True
+    row = await db.get(ClinicFeature, (clinic_id, feature))
+    return True if row is None else bool(row.enabled)
+
+
 async def features_for_clinic(
     db: AsyncSession, clinic_id: uuid.UUID | None
 ) -> dict[str, bool]:

@@ -13,6 +13,7 @@ from app.modules.auth.deps import (
     require_authenticated,
     require_engineer,
     require_staff,
+    requires,
 )
 from app.modules.users.models import User
 
@@ -33,7 +34,12 @@ async def list_alerts(
     )
 
 
-@router.post("", response_model=AlertOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=AlertOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("work", "alerts"))],
+)
 async def create_alert(
     payload: AlertCreate,
     db: AsyncSession = Depends(get_session),
@@ -42,7 +48,11 @@ async def create_alert(
     return await service.create(db, payload)
 
 
-@router.post("/{alert_id}/ack", response_model=AlertOut)
+@router.post(
+    "/{alert_id}/ack",
+    response_model=AlertOut,
+    dependencies=[Depends(requires("work", "alerts"))],
+)
 async def acknowledge(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
@@ -51,7 +61,11 @@ async def acknowledge(
     return await service.acknowledge(db, alert_id, clinic_scope(current))
 
 
-@router.post("/{alert_id}/resolve", response_model=AlertOut)
+@router.post(
+    "/{alert_id}/resolve",
+    response_model=AlertOut,
+    dependencies=[Depends(requires("work", "alerts"))],
+)
 async def resolve(
     alert_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
@@ -60,7 +74,7 @@ async def resolve(
     return await service.resolve(db, alert_id, clinic_scope(current))
 
 
-@router.post("/sweep")
+@router.post("/sweep", dependencies=[Depends(requires("work", "alerts"))])
 async def sweep(
     db: AsyncSession = Depends(get_session),
     _: User = Depends(require_engineer),

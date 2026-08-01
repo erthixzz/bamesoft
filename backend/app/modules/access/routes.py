@@ -13,7 +13,7 @@ from app.modules.access.schemas import (
     RolesIn,
     RolesOut,
 )
-from app.modules.auth.deps import require_admin, require_authenticated
+from app.modules.auth.deps import require_admin, require_authenticated, requires
 from app.modules.users.models import User
 
 router = APIRouter(prefix="/access", tags=["access"])
@@ -27,7 +27,11 @@ async def get_roles(
     return RolesOut(matrix=await service.get_role_matrix(db))
 
 
-@router.put("/roles", response_model=RolesOut)
+@router.put(
+    "/roles",
+    response_model=RolesOut,
+    dependencies=[Depends(requires("access"))],
+)
 async def put_roles(
     payload: RolesIn,
     db: AsyncSession = Depends(get_session),
@@ -44,7 +48,11 @@ async def get_clinic_features(
     return ClinicFeaturesOut(matrix=await service.get_clinic_features(db))
 
 
-@router.put("/clinic-features", response_model=ClinicFeaturesOut)
+@router.put(
+    "/clinic-features",
+    response_model=ClinicFeaturesOut,
+    dependencies=[Depends(requires("access"))],
+)
 async def put_clinic_features(
     payload: ClinicFeaturesIn,
     db: AsyncSession = Depends(get_session),

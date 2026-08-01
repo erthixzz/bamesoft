@@ -6,7 +6,12 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_authenticated, require_engineer
+from app.modules.auth.deps import (
+    clinic_scope,
+    require_authenticated,
+    require_engineer,
+    requires,
+)
 from app.modules.sectors import service
 from app.modules.sectors.schemas import SectorCreate, SectorOut, SectorUpdate
 from app.modules.users.models import User
@@ -33,7 +38,12 @@ async def get_sector(
     return await service.get_sector(db, sector_id, clinic_scope(current))
 
 
-@router.post("", response_model=SectorOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SectorOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("sectors", "sectors"))],
+)
 async def create_sector(
     payload: SectorCreate,
     db: AsyncSession = Depends(get_session),
@@ -42,7 +52,11 @@ async def create_sector(
     return await service.create(db, payload, clinic_scope(current))
 
 
-@router.patch("/{sector_id}", response_model=SectorOut)
+@router.patch(
+    "/{sector_id}",
+    response_model=SectorOut,
+    dependencies=[Depends(requires("sectors", "sectors"))],
+)
 async def update_sector(
     sector_id: uuid.UUID,
     payload: SectorUpdate,

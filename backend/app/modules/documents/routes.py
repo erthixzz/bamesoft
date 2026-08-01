@@ -8,7 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import NotFound
 from app.db.enums import DocumentType
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_authenticated, require_staff
+from app.modules.auth.deps import (
+    clinic_scope,
+    require_authenticated,
+    require_staff,
+    requires,
+)
 from app.modules.cases import service as cases_service
 from app.modules.documents import service
 from app.modules.documents.models import Document
@@ -31,7 +36,12 @@ async def _assert_doc_in_scope(db: AsyncSession, doc: Document, scope: uuid.UUID
         raise NotFound("Documento")
 
 
-@router.post("", response_model=DocumentOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=DocumentOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("docs", "documents"))],
+)
 async def upload_document(
     file: UploadFile = File(...),
     title: str = Form(...),

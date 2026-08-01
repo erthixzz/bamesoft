@@ -9,7 +9,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.enums import EquipmentStatus
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_authenticated, require_engineer
+from app.modules.auth.deps import (
+    clinic_scope,
+    require_authenticated,
+    require_engineer,
+    requires,
+)
 from app.modules.equipment import qr, service
 from app.modules.equipment.life_sheet_schemas import LifeSheetOut, LifeSheetUpdate
 from app.modules.equipment.schemas import (
@@ -48,7 +53,12 @@ async def list_equipment(
     )
 
 
-@router.post("", response_model=EquipmentOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=EquipmentOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("equipment", "equipment"))],
+)
 async def create_equipment(
     payload: EquipmentCreate,
     db: AsyncSession = Depends(get_session),
@@ -105,7 +115,11 @@ async def get_equipment(
     return await service.get_equipment(db, equipment_id, clinic_scope(current))
 
 
-@router.patch("/{equipment_id}", response_model=EquipmentOut)
+@router.patch(
+    "/{equipment_id}",
+    response_model=EquipmentOut,
+    dependencies=[Depends(requires("equipment", "equipment"))],
+)
 async def update_equipment(
     equipment_id: uuid.UUID,
     payload: EquipmentUpdate,
@@ -115,7 +129,11 @@ async def update_equipment(
     return await service.update_equipment(db, equipment_id, payload, clinic_scope(current))
 
 
-@router.post("/{equipment_id}/regenerate-qr", response_model=EquipmentOut)
+@router.post(
+    "/{equipment_id}/regenerate-qr",
+    response_model=EquipmentOut,
+    dependencies=[Depends(requires("equipment", "equipment"))],
+)
 async def regenerate_qr_token(
     equipment_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
@@ -134,7 +152,11 @@ async def get_life_sheet(
     return await service.get_life_sheet(db, equipment_id, clinic_scope(current))
 
 
-@router.put("/{equipment_id}/life-sheet", response_model=LifeSheetOut)
+@router.put(
+    "/{equipment_id}/life-sheet",
+    response_model=LifeSheetOut,
+    dependencies=[Depends(requires("equipment", "equipment"))],
+)
 async def save_life_sheet(
     equipment_id: uuid.UUID,
     payload: LifeSheetUpdate,

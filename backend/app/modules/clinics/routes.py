@@ -7,7 +7,12 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_admin, require_authenticated
+from app.modules.auth.deps import (
+    clinic_scope,
+    require_admin,
+    require_authenticated,
+    requires,
+)
 from app.modules.clinics import service
 from app.modules.clinics.schemas import (
     ClinicCreate,
@@ -30,7 +35,12 @@ async def list_clinics(
     return list(await service.list_clinics(db, clinic_scope(current)))
 
 
-@router.post("", response_model=ClinicOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=ClinicOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("clinics"))],
+)
 async def create_clinic(
     payload: ClinicCreate,
     db: AsyncSession = Depends(get_session),
@@ -48,7 +58,11 @@ async def get_clinic(
     return await service.get_clinic(db, clinic_id, clinic_scope(current))
 
 
-@router.patch("/{clinic_id}", response_model=ClinicOut)
+@router.patch(
+    "/{clinic_id}",
+    response_model=ClinicOut,
+    dependencies=[Depends(requires("clinics"))],
+)
 async def update_clinic(
     clinic_id: uuid.UUID,
     payload: ClinicUpdate,
@@ -63,8 +77,10 @@ async def update_clinic(
 async def list_locations(
     clinic_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
-    _: User = Depends(require_authenticated),
+    current: User = Depends(require_authenticated),
 ):
+    # 404 si la clínica no es la del usuario (no revela existencia).
+    await service.get_clinic(db, clinic_id, clinic_scope(current))
     return list(await service.list_locations(db, clinic_id))
 
 
@@ -72,6 +88,7 @@ async def list_locations(
     "/{clinic_id}/locations",
     response_model=LocationOut,
     status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("clinics"))],
 )
 async def create_location(
     clinic_id: uuid.UUID,
@@ -83,7 +100,11 @@ async def create_location(
     return await service.create_location(db, payload)
 
 
-@router.patch("/locations/{location_id}", response_model=LocationOut)
+@router.patch(
+    "/locations/{location_id}",
+    response_model=LocationOut,
+    dependencies=[Depends(requires("clinics"))],
+)
 async def update_location(
     location_id: uuid.UUID,
     payload: LocationUpdate,

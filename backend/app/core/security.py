@@ -9,7 +9,6 @@ Probamos primero con el secreto compartido y, si falla, caemos al JWKS público.
 from __future__ import annotations
 
 import time
-from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import httpx
@@ -22,15 +21,8 @@ class TokenError(Exception):
     """Raised when a token cannot be validated."""
 
 
-# ---- HS256 (creación local + verificación legacy) ---------------------------
-def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
-    expire = datetime.now(UTC) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    payload: dict[str, Any] = {"sub": subject, "exp": expire, **(extra or {})}
-    return jwt.encode(
-        payload,
-        settings.SUPABASE_JWT_SECRET or "dev-insecure-secret",
-        algorithm=settings.JWT_ALGORITHM,
-    )
+# Este módulo solo VERIFICA tokens; no los emite. Los emite Supabase Auth
+# (GoTrue) y el login del backend es un proxy a su endpoint (`auth/service.py`).
 
 
 # ---- JWKS cache -------------------------------------------------------------
@@ -85,24 +77,53 @@ def _decode_with_jwks(token: str) -> dict[str, Any]:
     )
 
 
+def _check_claims(claims: dict[str, Any]) -> dict[str, Any]:
+    """Valida emisor y audiencia *si el token los trae*.
+
+    La firma ya se verificó, así que un atacante no puede alterar estos campos;
+    el objetivo es rechazar tokens legítimos de OTRO proyecto o de otro público
+    (p. ej. una anon key usada como Bearer). Se validan solo cuando están
+    presentes para no romper tokens legacy que no los incluyen.
+    """
+    issuer = claims.get("iss")
+    if issuer and settings.SUPABASE_URL:
+        expected = f"{settings.SUPABASE_URL.rstrip('/')}/auth/v1"
+        if issuer != expected:
+            raise TokenError(f"Emisor no esperado: {issuer}")
+
+    audience = claims.get("aud")
+    if audience:
+        allowed = {"authenticated"}
+        got = set(audience) if isinstance(audience, list) else {audience}
+        if not (got & allowed):
+            raise TokenError(f"Audiencia no esperada: {audience}")
+
+    return claims
+
+
 def decode_token(token: str) -> dict[str, Any]:
     """Verifica un JWT contra el secreto legacy y, si falla, contra JWKS."""
-    secret = settings.SUPABASE_JWT_SECRET or "dev-insecure-secret"
+    legacy_msg = "sin SUPABASE_JWT_SECRET configurado"
 
-    # 1) Intento HS256 con el legacy secret.
-    try:
-        return jwt.decode(
-            token,
-            secret,
-            algorithms=[settings.JWT_ALGORITHM],
-            options={"verify_aud": False},
-        )
-    except JWTError as legacy_exc:
-        legacy_msg = str(legacy_exc)
+    # 1) Intento HS256 con el legacy secret. Sin secreto no se intenta: antes
+    #    había un fallback a "dev-insecure-secret" que en un entorno mal
+    #    configurado habría aceptado tokens firmados con esa cadena pública.
+    if settings.SUPABASE_JWT_SECRET:
+        try:
+            return _check_claims(
+                jwt.decode(
+                    token,
+                    settings.SUPABASE_JWT_SECRET,
+                    algorithms=[settings.JWT_ALGORITHM],
+                    options={"verify_aud": False},  # la audiencia la revisa _check_claims
+                )
+            )
+        except JWTError as legacy_exc:
+            legacy_msg = str(legacy_exc)
 
     # 2) Intento JWKS (ES256 / RS256 firmados por Supabase Auth nuevos).
     try:
-        return _decode_with_jwks(token)
+        return _check_claims(_decode_with_jwks(token))
     except (JWTError, TokenError) as jwks_exc:
         raise TokenError(
             f"Legacy: {legacy_msg} · JWKS: {jwks_exc}"

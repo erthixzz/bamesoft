@@ -11,6 +11,7 @@ from app.core.errors import Forbidden, Unauthorized
 from app.core.security import TokenError, decode_token
 from app.db.enums import UserRole
 from app.db.session import get_session
+from app.modules.access import service as access_service
 from app.modules.users.models import User
 
 
@@ -62,12 +63,20 @@ async def require_authenticated(
     return await _user_from_token(authorization, db)
 
 
+# El guard más permisivo: exige sesión válida y usuario activo, sin filtrar rol.
+# Se marca igual que los demás para que el gate de cobertura lo reconozca.
+require_authenticated.__guard_roles__ = frozenset(UserRole)  # type: ignore[attr-defined]
+
+
 def require_role(*roles: UserRole):
     async def _dep(user: User = Depends(require_authenticated)) -> User:
         if user.role not in roles:
             raise Forbidden(f"Requiere uno de los roles: {', '.join(r.value for r in roles)}")
         return user
 
+    # Marca introspectable: `tests/test_authz_coverage.py` recorre las rutas y
+    # exige que toda mutación tenga guard de rol + capacidad.
+    _dep.__guard_roles__ = frozenset(roles)  # type: ignore[attr-defined]
     return _dep
 
 
@@ -83,6 +92,55 @@ require_staff = require_role(
 )
 
 
+async def assert_capability(
+    db: AsyncSession, user: User, capability: str, feature: str | None = None
+) -> None:
+    """Versión imperativa de `requires(...)`, para comprobaciones que dependen
+    del cuerpo de la petición (p. ej. cerrar un caso exige la capacidad `close`,
+    pero se decide mirando el `status` que llega en el payload).
+
+    Mismas reglas que `requires`: el super admin siempre pasa.
+    """
+    if user.role == UserRole.ADMIN:
+        return
+    if not await access_service.role_has_capability(db, user.role.value, capability):
+        raise Forbidden(f"Tu rol no tiene permitida la acción «{capability}»")
+    if feature is not None and not await access_service.feature_enabled(
+        db, user.clinic_id, feature
+    ):
+        raise Forbidden(f"El módulo «{feature}» no está habilitado para tu compañía")
+
+
+def requires(capability: str, feature: str | None = None):
+    """Exige una capacidad de la matriz **Roles** y, si se indica, que el módulo
+    esté habilitado para la compañía (matriz **Permisos**).
+
+    Se usa en las MUTACIONES, junto al guard de rol correspondiente: el rol es
+    la defensa base (hardcodeada, no editable desde la UI) y la matriz es la
+    capa configurable encima. Ambas deben pasar.
+
+    No se aplica a las lecturas: las capacidades son permisos de *navegación* y
+    una página compone datos de varios módulos (p. ej. `/cases` lee equipos,
+    usuarios y sectores). Exigirlas en los GET rompería esas páginas. Las
+    lecturas quedan protegidas por rol + `clinic_scope`.
+
+    El super admin siempre pasa: si la matriz pudiera dejarlo fuera, un cambio
+    desafortunado dejaría la plataforma sin quien la administre.
+    """
+
+    async def _dep(
+        user: User = Depends(require_authenticated),
+        db: AsyncSession = Depends(get_session),
+    ) -> User:
+        await assert_capability(db, user, capability, feature)
+        return user
+
+    # Marca introspectable para el gate de cobertura (ver require_role).
+    _dep.__capability__ = capability  # type: ignore[attr-defined]
+    _dep.__feature__ = feature  # type: ignore[attr-defined]
+    return _dep
+
+
 def clinic_scope(user: User) -> uuid.UUID | None:
     """Clínica a la que se limita el usuario.
 
@@ -96,6 +154,7 @@ def clinic_scope(user: User) -> uuid.UUID | None:
 
 
 __all__ = [
+    "assert_capability",
     "clinic_scope",
     "require_admin",
     "require_authenticated",
@@ -103,4 +162,5 @@ __all__ = [
     "require_engineer",
     "require_role",
     "require_staff",
+    "requires",
 ]

@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import require_admin, require_authenticated
+from app.modules.auth.deps import require_admin, require_authenticated, requires
 from app.modules.standards import service
 from app.modules.standards.schemas import EquipmentStandardLink, StandardCreate, StandardOut
 from app.modules.users.models import User
@@ -22,7 +22,12 @@ async def list_standards(
     return list(await service.list_standards(db))
 
 
-@router.post("", response_model=StandardOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=StandardOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("standards", "standards"))],
+)
 async def create_standard(
     payload: StandardCreate,
     db: AsyncSession = Depends(get_session),
@@ -31,7 +36,11 @@ async def create_standard(
     return await service.create(db, payload)
 
 
-@router.post("/link", status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/link",
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("standards", "standards"))],
+)
 async def link_standard(
     payload: EquipmentStandardLink,
     db: AsyncSession = Depends(get_session),

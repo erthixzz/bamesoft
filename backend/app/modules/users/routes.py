@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, File, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_session
-from app.modules.auth.deps import clinic_scope, require_authenticated, require_clinic_admin
+from app.modules.auth.deps import (
+    assert_capability,
+    clinic_scope,
+    require_authenticated,
+    require_clinic_admin,
+    requires,
+)
 from app.modules.documents.schemas import SignedUrlOut
 from app.modules.users import service
 from app.modules.users.models import User
@@ -43,7 +49,12 @@ async def get_user(
     return await service.get_user(db, user_id, clinic_scope(current))
 
 
-@router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("users"))],
+)
 async def create_user(
     payload: UserCreate,
     db: AsyncSession = Depends(get_session),
@@ -52,7 +63,12 @@ async def create_user(
     return await service.create_user(db, payload, clinic_scope(current))
 
 
-@router.post("/invite", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/invite",
+    response_model=UserOut,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(requires("users"))],
+)
 async def invite_user(
     payload: UserInvite,
     db: AsyncSession = Depends(get_session),
@@ -62,7 +78,11 @@ async def invite_user(
     return await service.invite_user(db, payload, clinic_scope(current))
 
 
-@router.patch("/{user_id}", response_model=UserOut)
+@router.patch(
+    "/{user_id}",
+    response_model=UserOut,
+    dependencies=[Depends(requires("users"))],
+)
 async def update_user(
     user_id: uuid.UUID,
     payload: UserUpdate,
@@ -72,7 +92,11 @@ async def update_user(
     return await service.update_user(db, user_id, payload, clinic_scope(current))
 
 
-@router.delete("/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{user_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("users"))],
+)
 async def deactivate_user(
     user_id: uuid.UUID,
     db: AsyncSession = Depends(get_session),
@@ -81,7 +105,11 @@ async def deactivate_user(
     await service.deactivate_user(db, user_id, clinic_scope(current))
 
 
-@router.post("/{user_id}/cv", response_model=UserOut)
+@router.post(
+    "/{user_id}/cv",
+    response_model=UserOut,
+    dependencies=[Depends(requires("users"))],
+)
 async def upload_cv(
     user_id: uuid.UUID,
     file: UploadFile = File(...),
@@ -107,6 +135,13 @@ async def get_cv_url(
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_authenticated),
 ) -> SignedUrlOut:
-    """URL firmada para ver la hoja de vida del usuario."""
+    """URL firmada para ver la hoja de vida del usuario.
+
+    La hoja de vida es un dato personal (cédula, títulos, tarjeta profesional):
+    solo la ve su dueño o quien administre usuarios en esa clínica. Antes la
+    veía cualquier usuario de la clínica, incluido un `client`.
+    """
+    if current.id != user_id:
+        await assert_capability(db, current, "users")
     url = await service.cv_signed_url(db, user_id, clinic_scope(current))
     return SignedUrlOut(url=url, expires_in=expires_in)

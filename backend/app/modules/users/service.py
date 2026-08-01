@@ -1,6 +1,7 @@
 """Lógica de negocio de Users."""
 from __future__ import annotations
 
+import contextlib
 import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
@@ -70,16 +71,52 @@ async def create_user(
     return user
 
 
+def _find_auth_user_id(admin, email: str) -> str | None:
+    """Busca en Supabase Auth un usuario por email. `None` si no existe.
+
+    Sirve para recuperar cuentas huérfanas: si un intento anterior creó la
+    cuenta en Auth pero falló al guardar el perfil, el email quedaría bloqueado
+    para siempre. Al encontrarla, la adoptamos en vez de rechazar el alta.
+    """
+    try:
+        listed = admin.auth.admin.list_users()
+    except Exception:
+        return None
+    # supabase-py ha devuelto tanto una lista como un objeto con `.users`.
+    users = getattr(listed, "users", listed) or []
+    target = email.strip().lower()
+    for u in users:
+        if (getattr(u, "email", "") or "").strip().lower() == target:
+            return getattr(u, "id", None)
+    return None
+
+
 async def invite_user(
     db: AsyncSession, payload: UserInvite, scope: uuid.UUID | None = None
 ) -> User:
-    """Alta completa desde la UI: crea la cuenta en Supabase Auth y el perfil."""
+    """Alta completa desde la UI: crea la cuenta en Supabase Auth y el perfil.
+
+    Son dos sistemas distintos (GoTrue + Postgres) y no comparten transacción.
+    El orden es: crear en Auth → guardar perfil → confirmar. Si el perfil falla,
+    se **compensa** borrando la cuenta de Auth recién creada; de lo contrario
+    quedaría huérfana y el email sería inusable para siempre.
+    """
     if await get_by_email(db, payload.email):
         raise Conflict("El email ya está registrado")
     _guard_scope(payload.role, scope)
 
     try:
-        res = supabase_admin().auth.admin.create_user(
+        admin = supabase_admin()
+    except RuntimeError as exc:  # falta URL / SERVICE_KEY en el entorno
+        raise BadRequest(
+            "El servidor no tiene configurado Supabase (URL / SERVICE_KEY); "
+            "no se pueden crear cuentas."
+        ) from exc
+
+    # 1) Cuenta en Supabase Auth.
+    created_here = False
+    try:
+        res = admin.auth.admin.create_user(
             {
                 "email": payload.email,
                 "password": payload.password,
@@ -87,24 +124,47 @@ async def invite_user(
                 "user_metadata": {"full_name": payload.full_name},
             }
         )
+        auth_id = res.user.id
+        created_here = True
     except Exception as exc:  # supabase-py lanza errores genéricos
         msg = str(exc)
-        if "already" in msg.lower():
-            raise Conflict("El email ya existe en el sistema de autenticación") from exc
-        raise BadRequest(f"No se pudo crear la cuenta: {msg}") from exc
+        if "already" not in msg.lower():
+            raise BadRequest(f"No se pudo crear la cuenta: {msg}") from exc
+        # Existe en Auth pero no en nuestra BD (lo comprobamos arriba): es una
+        # cuenta huérfana de un intento fallido. La adoptamos.
+        auth_id = _find_auth_user_id(admin, payload.email)
+        if auth_id is None:
+            raise Conflict(
+                "El email ya existe en el sistema de autenticación y no se pudo "
+                "recuperar. Elimínalo desde Supabase Auth e inténtalo de nuevo."
+            ) from exc
 
-    user = User(
-        id=uuid.UUID(res.user.id),
-        email=payload.email,
-        full_name=payload.full_name,
-        role=payload.role,
-        phone=payload.phone,
-        license_number=payload.license_number,
-        clinic_id=scope if scope is not None else payload.clinic_id,
-    )
-    db.add(user)
-    await db.flush()
-    await db.refresh(user)
+    # 2) Perfil en Postgres. Si falla, deshacemos la cuenta de Auth.
+    try:
+        user = User(
+            id=uuid.UUID(auth_id),
+            email=payload.email,
+            full_name=payload.full_name,
+            role=payload.role,
+            phone=payload.phone,
+            license_number=payload.license_number,
+            clinic_id=scope if scope is not None else payload.clinic_id,
+        )
+        db.add(user)
+        await db.flush()
+        # Commit explícito: cierra la ventana en la que el perfil podría fallar
+        # después de que esta función retorne, cuando ya no podríamos compensar.
+        await db.commit()
+        await db.refresh(user)
+    except Exception as exc:
+        await db.rollback()
+        if created_here:  # solo borramos lo que creamos nosotros
+            # Si la compensación falla no hay nada más que hacer: el error que
+            # le importa al usuario es el de abajo.
+            with contextlib.suppress(Exception):
+                admin.auth.admin.delete_user(auth_id)
+        raise BadRequest(f"No se pudo guardar el perfil del usuario: {exc}") from exc
+
     return user
 
 

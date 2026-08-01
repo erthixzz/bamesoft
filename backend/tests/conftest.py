@@ -15,3 +15,7 @@ async def client() -> AsyncIterator[AsyncClient]:
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
+
+
+# Fixtures de integración (Postgres real). Ver `tests/conftest_db.py`.
+pytest_plugins = ["tests.conftest_db"]
