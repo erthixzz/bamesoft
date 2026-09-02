@@ -5,12 +5,18 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, SmallInteger, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
-from app.db.enums import CaseCompletion, CasePriority, CaseSatisfaction, CaseStatus, CaseType
+from app.db.enums import (
+    CaseCompletion,
+    CasePriority,
+    CaseStatus,
+    CaseType,
+    TecnovigilanciaStage,
+)
 from app.db.mixins import Timestamps, UUIDPrimaryKey
 from app.db.types import pg_enum
 
@@ -71,12 +77,23 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     completion: Mapped[CaseCompletion | None] = mapped_column(
         pg_enum(CaseCompletion, "case_completion")
     )
-    satisfaction: Mapped[CaseSatisfaction | None] = mapped_column(
-        pg_enum(CaseSatisfaction, "case_satisfaction")
-    )
+    # Satisfacción en escala Likert de 7 puntos (1 = Muy insatisfecho … 7 = Muy
+    # satisfecho). La columna `satisfaction` (3 caritas) quedó obsoleta en 0015.
+    satisfaction_score: Mapped[int | None] = mapped_column(SmallInteger)
     receiver_name: Mapped[str | None] = mapped_column(String(255))
     receiver_doc: Mapped[str | None] = mapped_column(String(64))
     signature_path: Mapped[str | None] = mapped_column(String(1024))
+
+    # Tecnovigilancia: el caso corresponde a un evento adverso / incidente en el
+    # que el dispositivo causó (o pudo causar) daño al paciente o al operador.
+    is_tecnovigilancia: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
+    tecnovigilancia_stage: Mapped[TecnovigilanciaStage | None] = mapped_column(
+        pg_enum(TecnovigilanciaStage, "tecnovigilancia_stage")
+    )
+    tecnovigilancia_description: Mapped[str | None] = mapped_column(Text)
+    tecnovigilancia_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     equipment: Mapped["Equipment"] = relationship(back_populates="cases")
     reporter: Mapped["User | None"] = relationship(foreign_keys=[reported_by])

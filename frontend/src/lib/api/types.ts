@@ -40,7 +40,18 @@ export type CasePriority = 'low' | 'medium' | 'high' | 'critical';
 
 export type CaseCompletion = 'complete' | 'incomplete';
 
-export type CaseSatisfaction = 'bueno' | 'regular' | 'malo';
+/** Satisfacción del servicio: escala Likert de 7 puntos (1 = Muy insatisfecho
+ *  … 7 = Muy satisfecho). Sustituye a las 3 caritas (migración 0015). */
+export type SatisfactionScore = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** Etapa del proceso de tecnovigilancia de un caso. */
+export type TecnovigilanciaStage =
+  | 'detection'
+  | 'report'
+  | 'investigation'
+  | 'corrective_action'
+  | 'follow_up'
+  | 'closed';
 
 export type AlertType =
   | 'preventive_due'

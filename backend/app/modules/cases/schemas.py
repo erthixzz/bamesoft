@@ -4,9 +4,17 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from app.db.enums import CaseCompletion, CasePriority, CaseSatisfaction, CaseStatus, CaseType
+from app.db.enums import (
+    SATISFACTION_MAX,
+    SATISFACTION_MIN,
+    CaseCompletion,
+    CasePriority,
+    CaseStatus,
+    CaseType,
+    TecnovigilanciaStage,
+)
 
 
 class CaseBase(BaseModel):
@@ -32,10 +40,27 @@ class CaseResolution(BaseModel):
     parts_count: int | None = Field(default=None, ge=0)
     parts_detail: str | None = None
     completion: CaseCompletion | None = None
-    satisfaction: CaseSatisfaction | None = None
+    # Satisfacción del servicio en escala Likert de 7 puntos.
+    satisfaction_score: int | None = Field(
+        default=None, ge=SATISFACTION_MIN, le=SATISFACTION_MAX
+    )
     receiver_name: str | None = Field(default=None, max_length=255)
     receiver_doc: str | None = Field(default=None, max_length=64)
     signature_path: str | None = Field(default=None, max_length=1024)
+
+
+class CaseTecnovigilancia(BaseModel):
+    """Marcado de tecnovigilancia sobre un caso ya creado."""
+
+    is_tecnovigilancia: bool
+    stage: TecnovigilanciaStage | None = None
+    description: str | None = Field(default=None, max_length=4000)
+
+    @model_validator(mode="after")
+    def _require_stage(self) -> CaseTecnovigilancia:
+        if self.is_tecnovigilancia and self.stage is None:
+            raise ValueError("Indica la etapa de tecnovigilancia")
+        return self
 
 
 class CaseUpdate(CaseResolution):
@@ -61,6 +86,10 @@ class CaseOut(CaseBase, CaseResolution):
     accepted_at: datetime | None = None
     work_started_at: datetime | None = None
     finished_at: datetime | None = None
+    is_tecnovigilancia: bool = False
+    tecnovigilancia_stage: TecnovigilanciaStage | None = None
+    tecnovigilancia_description: str | None = None
+    tecnovigilancia_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 

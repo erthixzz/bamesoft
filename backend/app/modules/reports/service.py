@@ -8,7 +8,17 @@ from datetime import UTC, date, datetime, timedelta
 from sqlalchemy import and_, distinct, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.db.enums import CaseCompletion, CaseSatisfaction, CaseStatus, CaseType
+from app.db.enums import (
+    SATISFACTION_MAX,
+    SATISFACTION_MIN,
+    SATISFACTION_NEGATIVE,
+    SATISFACTION_NEUTRAL,
+    SATISFACTION_POSITIVE,
+    CaseCompletion,
+    CaseStatus,
+    CaseType,
+    TecnovigilanciaStage,
+)
 from app.modules.cases.models import Case
 from app.modules.equipment.models import Equipment
 from app.modules.reports.schemas import (
@@ -26,6 +36,8 @@ from app.modules.reports.schemas import (
     ReporterRow,
     ServiceRow,
     ServicesReport,
+    TecnovigilanciaReport,
+    TecnovigilanciaRow,
 )
 from app.modules.sectors.models import Sector
 from app.modules.standards.models import EquipmentStandard, Standard
@@ -214,15 +226,16 @@ async def productivity(
     fcr = func.count().filter(
         (Case.status == CaseStatus.CLOSED) & (Case.completion == CaseCompletion.COMPLETE)
     )
-    # Satisfacción (caritas) solo cuenta en casos ya cerrados.
-    sat_good = func.count().filter(
-        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.BUENO)
+    # Satisfacción (Likert 1-7) solo cuenta en casos ya cerrados y calificados.
+    _rated = (Case.status == CaseStatus.CLOSED) & Case.satisfaction_score.is_not(None)
+    sat_count = func.count().filter(_rated)
+    sat_avg = func.avg(Case.satisfaction_score).filter(_rated)
+    sat_positive = func.count().filter(
+        _rated & Case.satisfaction_score.in_(SATISFACTION_POSITIVE)
     )
-    sat_regular = func.count().filter(
-        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.REGULAR)
-    )
-    sat_bad = func.count().filter(
-        (Case.status == CaseStatus.CLOSED) & (Case.satisfaction == CaseSatisfaction.MALO)
+    sat_neutral = func.count().filter(_rated & Case.satisfaction_score.in_(SATISFACTION_NEUTRAL))
+    sat_negative = func.count().filter(
+        _rated & Case.satisfaction_score.in_(SATISFACTION_NEGATIVE)
     )
 
     stmt = (
@@ -237,9 +250,11 @@ async def productivity(
             avg_secs(Case.accepted_at, Case.work_started_at).label("to_start"),
             avg_secs(Case.work_started_at, Case.finished_at).label("work"),
             fcr.label("fcr"),
-            sat_good.label("sat_good"),
-            sat_regular.label("sat_regular"),
-            sat_bad.label("sat_bad"),
+            sat_count.label("sat_count"),
+            sat_avg.label("sat_avg"),
+            sat_positive.label("sat_positive"),
+            sat_neutral.label("sat_neutral"),
+            sat_negative.label("sat_negative"),
         )
         .join(User, User.id == Case.assigned_to, isouter=True)
         .where(Case.assigned_to.is_not(None), *rng)
@@ -251,9 +266,11 @@ async def productivity(
 
     items: list[ProductivityRow] = []
     tot_att = tot_comp = tot_inc = tot_fcr = 0
-    tot_good = tot_reg = tot_bad = 0
+    tot_sat = tot_pos = tot_neu = tot_neg = 0
+    sat_sum = 0.0
     for r in rows:
         att = r.attended or 0
+        n_sat = r.sat_count or 0
         items.append(
             ProductivityRow(
                 engineer_id=str(r.eid) if r.eid else None,
@@ -267,18 +284,24 @@ async def productivity(
                 avg_work_hours=_hours(r.work),
                 fcr_count=r.fcr or 0,
                 fcr_pct=round((r.fcr or 0) / att * 100.0, 1) if att else 0.0,
-                sat_good=r.sat_good or 0,
-                sat_regular=r.sat_regular or 0,
-                sat_bad=r.sat_bad or 0,
+                sat_count=n_sat,
+                sat_avg=round(float(r.sat_avg), 2) if r.sat_avg is not None else None,
+                sat_positive=r.sat_positive or 0,
+                sat_neutral=r.sat_neutral or 0,
+                sat_negative=r.sat_negative or 0,
             )
         )
         tot_att += att
         tot_comp += r.completed or 0
         tot_inc += r.incomplete or 0
         tot_fcr += r.fcr or 0
-        tot_good += r.sat_good or 0
-        tot_reg += r.sat_regular or 0
-        tot_bad += r.sat_bad or 0
+        tot_sat += n_sat
+        tot_pos += r.sat_positive or 0
+        tot_neu += r.sat_neutral or 0
+        tot_neg += r.sat_negative or 0
+        # Promedio global ponderado por número de respuestas de cada ingeniero.
+        if r.sat_avg is not None:
+            sat_sum += float(r.sat_avg) * n_sat
 
     return ProductivityReport(
         items=items,
@@ -287,9 +310,11 @@ async def productivity(
         incomplete=tot_inc,
         fcr_count=tot_fcr,
         fcr_pct=round(tot_fcr / tot_att * 100.0, 1) if tot_att else 0.0,
-        sat_good=tot_good,
-        sat_regular=tot_reg,
-        sat_bad=tot_bad,
+        sat_count=tot_sat,
+        sat_avg=round(sat_sum / tot_sat, 2) if tot_sat else None,
+        sat_positive=tot_pos,
+        sat_neutral=tot_neu,
+        sat_negative=tot_neg,
     )
 
 
@@ -487,6 +512,9 @@ async def services_report(
     scope: uuid.UUID | None = None,
     engineer_id: uuid.UUID | None = None,
     equipment_id: uuid.UUID | None = None,
+    satisfaction_min: int | None = None,
+    satisfaction_max: int | None = None,
+    tecnovigilancia: bool | None = None,
     limit: int = 300,
 ) -> ServicesReport:
     """Detalle servicio a servicio: qué se hizo, quién atendió y los tiempos."""
@@ -511,6 +539,12 @@ async def services_report(
         stmt = stmt.where(Case.assigned_to == engineer_id)
     if equipment_id:
         stmt = stmt.where(Case.equipment_id == equipment_id)
+    if satisfaction_min is not None:
+        stmt = stmt.where(Case.satisfaction_score >= satisfaction_min)
+    if satisfaction_max is not None:
+        stmt = stmt.where(Case.satisfaction_score <= satisfaction_max)
+    if tecnovigilancia is not None:
+        stmt = stmt.where(Case.is_tecnovigilancia.is_(tecnovigilancia))
     rows = (await db.execute(stmt)).all()
 
     items = [
@@ -523,7 +557,9 @@ async def services_report(
             type=c.type,
             status=c.status,
             completion=c.completion,
-            satisfaction=c.satisfaction,
+            satisfaction_score=c.satisfaction_score,
+            is_tecnovigilancia=c.is_tecnovigilancia,
+            tecnovigilancia_stage=c.tecnovigilancia_stage,
             work_performed=c.work_performed,
             operation_minutes=c.operation_minutes,
             opened_at=c.opened_at,
@@ -576,10 +612,131 @@ async def breakdown(
     )
     monthly = [NamedCount(label=str(k), value=n) for k, n in (await db.execute(m_stmt)).all() if k]
 
+    # Satisfacción Likert: se emiten SIEMPRE los 7 puntos (con 0 si nadie eligió
+    # ese valor) para que la gráfica conserve la forma de la escala.
+    sat_stmt = _scope_case(
+        select(Case.satisfaction_score, func.count()).where(
+            Case.satisfaction_score.is_not(None), *rng
+        ),
+        scope,
+    ).group_by(Case.satisfaction_score)
+    sat_map = {int(k): n for k, n in (await db.execute(sat_stmt)).all() if k is not None}
+    by_satisfaction = [
+        NamedCount(label=str(score), value=sat_map.get(score, 0))
+        for score in range(SATISFACTION_MIN, SATISFACTION_MAX + 1)
+    ]
+
     return BreakdownReport(
         by_status=by_status,
         by_type=by_type,
         by_priority=by_priority,
         by_sector=by_sector,
         monthly=monthly,
+        by_satisfaction=by_satisfaction,
+    )
+
+
+async def tecnovigilancia_report(
+    db: AsyncSession,
+    date_from: date | None = None,
+    date_to: date | None = None,
+    scope: uuid.UUID | None = None,
+    stage: TecnovigilanciaStage | None = None,
+    limit: int = 300,
+) -> TecnovigilanciaReport:
+    """Casos marcados como evento de tecnovigilancia (daño al paciente u operador
+    causado por el dispositivo), con su distribución por etapa del proceso."""
+    rng = _range_filters(date_from, date_to)
+    conds = [Case.is_tecnovigilancia.is_(True), *rng]
+    if stage is not None:
+        conds.append(Case.tecnovigilancia_stage == stage)
+
+    stmt = (
+        select(
+            Case,
+            Equipment.code.label("eq_code"),
+            Equipment.name.label("eq_name"),
+            Sector.name.label("sector_name"),
+            User.full_name.label("engineer"),
+        )
+        .join(Equipment, Equipment.id == Case.equipment_id)
+        .join(Sector, Sector.id == Equipment.sector_id, isouter=True)
+        .join(User, User.id == Case.assigned_to, isouter=True)
+        .where(*conds)
+        .order_by(func.coalesce(Case.tecnovigilancia_at, _opened_col()).desc())
+        .limit(limit)
+    )
+    if scope is not None:
+        stmt = stmt.where(Equipment.clinic_id == scope)
+    rows = (await db.execute(stmt)).all()
+
+    items = [
+        TecnovigilanciaRow(
+            case_id=str(c.id),
+            code=c.code,
+            title=c.title,
+            equipment_label=f"{eq_code} · {eq_name}",
+            sector_name=sector_name,
+            engineer_name=engineer,
+            status=c.status,
+            priority=c.priority,
+            stage=c.tecnovigilancia_stage,
+            description=c.tecnovigilancia_description,
+            marked_at=c.tecnovigilancia_at,
+            opened_at=c.opened_at,
+            closed_at=c.closed_at,
+        )
+        for c, eq_code, eq_name, sector_name, engineer in rows
+    ]
+
+    # Distribución por etapa: siempre las 6 etapas, en orden del proceso, para que
+    # se vea también dónde NO hay casos (p. ej. nada en "seguimiento").
+    stage_stmt = _scope_case(
+        select(Case.tecnovigilancia_stage, func.count()).where(
+            Case.is_tecnovigilancia.is_(True), *rng
+        ),
+        scope,
+    ).group_by(Case.tecnovigilancia_stage)
+    stage_map = {
+        (k.value if isinstance(k, TecnovigilanciaStage) else str(k)): n
+        for k, n in (await db.execute(stage_stmt)).all()
+        if k is not None
+    }
+    by_stage = [
+        NamedCount(label=s.value, value=stage_map.get(s.value, 0)) for s in TecnovigilanciaStage
+    ]
+
+    eq_stmt = (
+        select(
+            func.concat(Equipment.code, " · ", Equipment.name).label("label"),
+            func.count().label("n"),
+        )
+        .select_from(Case)
+        .join(Equipment, Equipment.id == Case.equipment_id)
+        .where(Case.is_tecnovigilancia.is_(True), *rng)
+    )
+    if scope is not None:
+        eq_stmt = eq_stmt.where(Equipment.clinic_id == scope)
+    eq_rows = (
+        await db.execute(
+            eq_stmt.group_by(Equipment.code, Equipment.name).order_by(func.count().desc()).limit(10)
+        )
+    ).all()
+    by_equipment = [NamedCount(label=str(r.label), value=r.n or 0) for r in eq_rows]
+
+    # Total sobre la tabla (no sobre `items`, que va limitado, ni sobre las
+    # etapas, porque un caso podría haber quedado marcado sin etapa).
+    total = await db.scalar(
+        _scope_case(
+            select(func.count()).select_from(Case).where(Case.is_tecnovigilancia.is_(True), *rng),
+            scope,
+        )
+    )
+    total = total or 0
+    return TecnovigilanciaReport(
+        items=items,
+        total=total,
+        open_total=max(0, total - stage_map.get(TecnovigilanciaStage.CLOSED.value, 0)),
+        by_stage=by_stage,
+        by_equipment=by_equipment,
     )

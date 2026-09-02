@@ -5,9 +5,10 @@
 import type {
   CaseCompletion,
   CasePriority,
-  CaseSatisfaction,
   CaseStatus,
   CaseType,
+  SatisfactionScore,
+  TecnovigilanciaStage,
 } from '$lib/api/types';
 import type { Case } from './types';
 
@@ -76,35 +77,175 @@ export const COMPLETION_OPTIONS = (Object.keys(COMPLETION_LABEL) as CaseCompleti
   (value) => ({ value, label: COMPLETION_LABEL[value] }),
 );
 
-// ---- Satisfacción del servicio (caritas) ----------------------------------
+// ---- Satisfacción del servicio · Likert de 7 puntos ------------------------
+// «¿Qué tan satisfecho(a) está con el servicio?» — 1 Muy insatisfecho …
+// 7 Muy satisfecho. Sustituye a las 3 caritas (bueno/regular/malo).
+
+export type SatisfactionGroup = 'negative' | 'neutral' | 'positive';
 
 export interface SatisfactionMeta {
-  label: string;
-  emoji: string; // carita para el PDF (sin dependencias de fuentes de iconos)
-  color: string; // hex del acento
-  tint: string; // fondo suave (tailwind class) para el botón activo
-  text: string; // texto (tailwind class)
+  score: SatisfactionScore;
+  label: string; // «Algo satisfecho»
+  color: string; // hex del acento (también para el PDF y las gráficas)
+  tint: string; // fondo suave (tailwind) del punto seleccionado
+  text: string; // color del texto (tailwind)
+  group: SatisfactionGroup;
 }
 
-export const SATISFACTION_META: Record<CaseSatisfaction, SatisfactionMeta> = {
-  bueno: { label: 'Bueno', emoji: '🙂', color: '#10b981', tint: 'bg-emerald-50', text: 'text-emerald-700' },
-  regular: { label: 'Regular', emoji: '😐', color: '#f59e0b', tint: 'bg-amber-50', text: 'text-amber-700' },
-  malo: { label: 'Malo', emoji: '☹️', color: '#ef4444', tint: 'bg-danger-50', text: 'text-danger-700' },
-};
+export const SATISFACTION_SCALE: SatisfactionMeta[] = [
+  { score: 1, label: 'Muy insatisfecho', color: '#b91c1c', tint: 'bg-danger-100', text: 'text-danger-800', group: 'negative' },
+  { score: 2, label: 'Insatisfecho', color: '#ef4444', tint: 'bg-danger-50', text: 'text-danger-700', group: 'negative' },
+  { score: 3, label: 'Algo insatisfecho', color: '#f97316', tint: 'bg-orange-50', text: 'text-orange-700', group: 'negative' },
+  { score: 4, label: 'Neutral', color: '#94a3b8', tint: 'bg-slate-100', text: 'text-slate-600', group: 'neutral' },
+  { score: 5, label: 'Algo satisfecho', color: '#84cc16', tint: 'bg-lime-50', text: 'text-lime-700', group: 'positive' },
+  { score: 6, label: 'Satisfecho', color: '#22c55e', tint: 'bg-green-50', text: 'text-green-700', group: 'positive' },
+  { score: 7, label: 'Muy satisfecho', color: '#059669', tint: 'bg-emerald-50', text: 'text-emerald-700', group: 'positive' },
+];
 
-export const SATISFACTION_LABEL: Record<CaseSatisfaction, string> = {
-  bueno: SATISFACTION_META.bueno.label,
-  regular: SATISFACTION_META.regular.label,
-  malo: SATISFACTION_META.malo.label,
-};
+export const SATISFACTION_BY_SCORE: Record<number, SatisfactionMeta> = Object.fromEntries(
+  SATISFACTION_SCALE.map((s) => [s.score, s]),
+);
 
-/** Orden bueno → regular → malo para el selector de caritas. */
-export const SATISFACTION_ORDER: CaseSatisfaction[] = ['bueno', 'regular', 'malo'];
+export const SATISFACTION_QUESTION = '¿Qué tan satisfecho(a) está con el servicio?';
 
-export const SATISFACTION_OPTIONS = SATISFACTION_ORDER.map((value) => ({
-  value,
-  label: SATISFACTION_META[value].label,
+/** «Algo satisfecho» — solo la etiqueta; '—' si aún sin calificar. */
+export function satisfactionLabel(score: number | null | undefined): string {
+  return score ? (SATISFACTION_BY_SCORE[score]?.label ?? String(score)) : '—';
+}
+
+/** «5 — Algo satisfecho» (formato completo, para PDF y bitácora). */
+export function satisfactionFull(score: number | null | undefined): string {
+  return score && SATISFACTION_BY_SCORE[score]
+    ? `${score} — ${SATISFACTION_BY_SCORE[score].label}`
+    : '—';
+}
+
+export function satisfactionColor(score: number | null | undefined): string {
+  return (score && SATISFACTION_BY_SCORE[score]?.color) || '#cbd5e1';
+}
+
+export const SATISFACTION_OPTIONS = SATISFACTION_SCALE.map((s) => ({
+  value: String(s.score),
+  label: `${s.score} — ${s.label}`,
 }));
+
+/** Agrupación para KPIs: 5-7 satisfechos · 4 neutral · 1-3 insatisfechos. */
+export const SATISFACTION_GROUP_META: Record<
+  SatisfactionGroup,
+  { label: string; hint: string; scores: SatisfactionScore[]; color: string; text: string }
+> = {
+  positive: {
+    label: 'Satisfechos',
+    hint: 'Calificaciones 5 a 7 (algo satisfecho, satisfecho, muy satisfecho).',
+    scores: [5, 6, 7],
+    color: '#22c55e',
+    text: 'text-emerald-700',
+  },
+  neutral: {
+    label: 'Neutrales',
+    hint: 'Calificación 4 (ni satisfecho ni insatisfecho).',
+    scores: [4],
+    color: '#94a3b8',
+    text: 'text-slate-600',
+  },
+  negative: {
+    label: 'Insatisfechos',
+    hint: 'Calificaciones 1 a 3 (algo insatisfecho, insatisfecho, muy insatisfecho).',
+    scores: [1, 2, 3],
+    color: '#ef4444',
+    text: 'text-danger-700',
+  },
+};
+
+export function satisfactionGroup(score: number | null | undefined): SatisfactionGroup | null {
+  return score ? (SATISFACTION_BY_SCORE[score]?.group ?? null) : null;
+}
+
+// ---- Tecnovigilancia -------------------------------------------------------
+// Un caso de tecnovigilancia es un evento adverso o incidente en el que el
+// dispositivo causó (o pudo causar) daño al paciente o al operador. El proceso
+// tiene etapas: se detecta, se reporta, se investiga, se corrige, se hace
+// seguimiento y se cierra.
+
+export interface TecnovigilanciaStageMeta {
+  label: string;
+  /** Qué significa la etapa (se muestra dentro del modal, junto a cada opción). */
+  description: string;
+  color: string; // hex del acento
+  tint: string; // fondo suave (tailwind)
+  text: string; // texto (tailwind)
+}
+
+export const TECNOVIGILANCIA_STAGE_ORDER: TecnovigilanciaStage[] = [
+  'detection',
+  'report',
+  'investigation',
+  'corrective_action',
+  'follow_up',
+  'closed',
+];
+
+export const TECNOVIGILANCIA_STAGE_META: Record<TecnovigilanciaStage, TecnovigilanciaStageMeta> = {
+  detection: {
+    label: 'Detección',
+    description: 'Se identificó el evento adverso o incidente con el equipo.',
+    color: '#f97316',
+    tint: 'bg-orange-50',
+    text: 'text-orange-700',
+  },
+  report: {
+    label: 'Reporte',
+    description: 'Notificado al comité de tecnovigilancia y/o al INVIMA.',
+    color: '#ef4444',
+    tint: 'bg-danger-50',
+    text: 'text-danger-700',
+  },
+  investigation: {
+    label: 'Investigación',
+    description: 'Análisis de causa raíz: qué falló y por qué.',
+    color: '#8b5cf6',
+    tint: 'bg-violet-50',
+    text: 'text-violet-700',
+  },
+  corrective_action: {
+    label: 'Acción correctiva',
+    description: 'Se ejecutan las acciones correctivas o preventivas definidas.',
+    color: '#1971f5',
+    tint: 'bg-brand-50',
+    text: 'text-brand-700',
+  },
+  follow_up: {
+    label: 'Seguimiento',
+    description: 'Verificación de que las acciones tomadas fueron eficaces.',
+    color: '#06b6d4',
+    tint: 'bg-cyan-50',
+    text: 'text-cyan-700',
+  },
+  closed: {
+    label: 'Cerrado',
+    description: 'El proceso de tecnovigilancia terminó y quedó documentado.',
+    color: '#10b981',
+    tint: 'bg-emerald-50',
+    text: 'text-emerald-700',
+  },
+};
+
+export const TECNOVIGILANCIA_STAGE_OPTIONS = TECNOVIGILANCIA_STAGE_ORDER.map((value) => ({
+  value,
+  label: TECNOVIGILANCIA_STAGE_META[value].label,
+}));
+
+/** Metadatos de la etapa a partir de un string suelto (API, filtros); `null` si
+ *  no corresponde a ninguna etapa conocida. */
+export function tecnovigilanciaStageMeta(
+  stage: string | null | undefined,
+): TecnovigilanciaStageMeta | null {
+  return stage ? (TECNOVIGILANCIA_STAGE_META[stage as TecnovigilanciaStage] ?? null) : null;
+}
+
+export function tecnovigilanciaStageLabel(stage: string | null | undefined): string {
+  return tecnovigilanciaStageMeta(stage)?.label ?? (stage || '—');
+}
 
 /** Descripción corta de cada estado (para la leyenda "?"). */
 export const STATUS_DESCRIPTIONS: Record<CaseStatus, string> = {
@@ -229,6 +370,7 @@ export const ACTION_LABEL: Record<string, string> = {
   updated: 'Actualización del caso',
   accepted: 'Tomado por el ingeniero',
   note: 'Nota',
+  tecnovigilancia: 'Marcado como tecnovigilancia',
 };
 
 export function actionLabel(action: string): string {
@@ -240,7 +382,9 @@ const FIELD_LABEL: Record<string, string> = {
   priority: 'Prioridad',
   type: 'Tipo',
   completion: 'Estado final',
-  satisfaction: 'Satisfacción',
+  satisfaction_score: 'Satisfacción',
+  tecnovigilancia: 'Tecnovigilancia',
+  tecnovigilancia_stage: 'Etapa de tecnovigilancia',
   operation_minutes: 'Tiempo de operación',
   work_performed: 'Actividad realizada',
   parts_count: 'N.º de repuestos',
@@ -264,10 +408,8 @@ function humanValue(key: string, raw: string): string {
   const v = raw.trim();
   if (key === 'status') return STATUS_META[v as CaseStatus]?.label ?? v;
   if (key === 'completion') return COMPLETION_LABEL[v as CaseCompletion] ?? v;
-  if (key === 'satisfaction') {
-    const m = SATISFACTION_META[v as CaseSatisfaction];
-    return m ? `${m.emoji} ${m.label}` : v;
-  }
+  if (key === 'satisfaction_score') return satisfactionFull(Number(v));
+  if (key === 'tecnovigilancia_stage') return tecnovigilanciaStageLabel(v);
   if (key === 'type') return TYPE_LABEL[v as CaseType] ?? v;
   if (key === 'priority') return PRIORITY_META[v as CasePriority]?.label ?? v;
   if (key === 'operation_minutes') return `${v} min`;

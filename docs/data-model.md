@@ -38,8 +38,20 @@ Activo médico individual. Campos relevantes:
 
 ### `cases`
 Ticket sobre un equipo. Tipos: `corrective | preventive | calibration |
-installation | inspection`. Lleva su propio `code` (`BMS-YYYYMM-XXXX`),
-`opened_at`, `sla_due_at`, `closed_at`.
+installation | inspection | mishandling`. Lleva su propio `code`
+(`BMS-YYYYMM-XXXX`), `opened_at`, `sla_due_at`, `closed_at`.
+
+- **Satisfacción**: `satisfaction_score` (smallint 1-7, escala Likert —
+  1 Muy insatisfecho … 4 Neutral … 7 Muy satisfecho). La columna `satisfaction`
+  (enum de 3 caritas) quedó obsoleta en la migración 0015; se conserva solo
+  como respaldo del backfill y la aplicación no la usa.
+- **Tecnovigilancia**: `is_tecnovigilancia` marca los casos en los que el equipo
+  causó —o pudo causar— daño al paciente o al operador.
+  `tecnovigilancia_stage` es la etapa del proceso (`detection | report |
+  investigation | corrective_action | follow_up | closed`),
+  `tecnovigilancia_description` el relato breve del evento y
+  `tecnovigilancia_at` cuándo se marcó. Un check garantiza que un caso sin la
+  marca no arrastre etapa ni descripción.
 
 ### `case_activities`
 Bitácora inmutable: cada acción (asignación, cambio de estado, nota técnica)

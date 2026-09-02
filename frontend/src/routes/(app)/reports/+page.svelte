@@ -19,13 +19,28 @@
     ProductivityReport,
     ServicesReport,
     ServiceRow,
+    TecnovigilanciaReport,
   } from '$lib/modules/reports/types';
-  import type { CaseCompletion, CasePriority, CaseStatus, CaseType } from '$lib/api/types';
+  import type {
+    CaseCompletion,
+    CasePriority,
+    CaseStatus,
+    CaseType,
+    TecnovigilanciaStage,
+  } from '$lib/api/types';
   import {
     TYPE_LABEL,
     TYPE_OPTIONS,
     COMPLETION_LABEL,
-    SATISFACTION_META,
+    SATISFACTION_BY_SCORE,
+    SATISFACTION_GROUP_META,
+    SATISFACTION_QUESTION,
+    satisfactionColor,
+    satisfactionLabel,
+    TECNOVIGILANCIA_STAGE_META,
+    TECNOVIGILANCIA_STAGE_OPTIONS,
+    tecnovigilanciaStageLabel,
+    tecnovigilanciaStageMeta,
     STATUS_META,
     PRIORITY_META,
     elapsedBetween,
@@ -46,6 +61,7 @@
     CalendarRange,
     Info,
     ShieldAlert,
+    SmilePlus,
   } from 'lucide-svelte';
 
   let compliance: ComplianceReport | null = null;
@@ -54,6 +70,7 @@
   let eqReport: EquipmentReport | null = null;
   let services: ServicesReport | null = null;
   let breakdown: BreakdownReport | null = null;
+  let tecno: TecnovigilanciaReport | null = null;
   let loading = true;
 
   // Rango por defecto: últimos 30 días.
@@ -64,11 +81,20 @@
   let dateTo = iso(today);
 
   // Apartados
-  type Tab = 'resumen' | 'analitica' | 'ingenieros' | 'equipos' | 'servicios';
+  type Tab =
+    | 'resumen'
+    | 'analitica'
+    | 'satisfaccion'
+    | 'tecnovigilancia'
+    | 'ingenieros'
+    | 'equipos'
+    | 'servicios';
   let tab: Tab = 'resumen';
   const TABS: { key: Tab; label: string; icon: typeof Gauge }[] = [
     { key: 'resumen', label: 'Resumen', icon: Gauge },
     { key: 'analitica', label: 'Analítica', icon: PieChart },
+    { key: 'satisfaccion', label: 'Satisfacción', icon: SmilePlus },
+    { key: 'tecnovigilancia', label: 'Tecnovigilancia', icon: ShieldAlert },
     { key: 'ingenieros', label: 'Por ingeniero', icon: Users },
     { key: 'equipos', label: 'Por equipo', icon: Stethoscope },
     { key: 'servicios', label: 'Servicios', icon: ClipboardList },
@@ -113,10 +139,82 @@
   $: engineerLoad = (prod?.items ?? []).map((r) => ({ label: r.engineer_name, value: r.attended }));
   $: engineerFcr = (prod?.items ?? []).map((r) => ({ label: r.engineer_name, value: r.fcr_pct }));
 
+  // Distribución Likert 1-7 (siempre los 7 puntos, con su color de la escala).
+  $: satisfactionChart = (breakdown?.by_satisfaction ?? []).map((d) => {
+    const score = Number(d.label);
+    return {
+      label: `${score} · ${satisfactionLabel(score)}`,
+      value: d.value,
+      color: satisfactionColor(score),
+    };
+  });
+  $: satisfactionGroupChart = prod
+    ? [
+        {
+          label: SATISFACTION_GROUP_META.positive.label,
+          value: prod.sat_positive,
+          color: SATISFACTION_GROUP_META.positive.color,
+        },
+        {
+          label: SATISFACTION_GROUP_META.neutral.label,
+          value: prod.sat_neutral,
+          color: SATISFACTION_GROUP_META.neutral.color,
+        },
+        {
+          label: SATISFACTION_GROUP_META.negative.label,
+          value: prod.sat_negative,
+          color: SATISFACTION_GROUP_META.negative.color,
+        },
+      ]
+    : [];
+  $: tecnoStageChart = (tecno?.by_stage ?? []).map((d) => ({
+    label: tecnovigilanciaStageLabel(d.label),
+    value: d.value,
+    color: TECNOVIGILANCIA_STAGE_META[d.label as TecnovigilanciaStage]?.color ?? '#94a3b8',
+  }));
+  $: tecnoEquipmentBars = (tecno?.by_equipment ?? []).map((d) => ({
+    label: d.label,
+    value: d.value,
+  }));
+  /** % de satisfechos (5-7) sobre las respuestas recibidas. */
+  $: satPositivePct =
+    prod && prod.sat_count ? Math.round((prod.sat_positive / prod.sat_count) * 100) : 0;
+
   // Filtros del apartado Servicios (sobre los datos ya cargados).
   let fEngineer = '';
   let fEquipment = '';
   let fType = '';
+  /** '' = todas · 'positive'|'neutral'|'negative' = grupo · '1'…'7' = puntaje exacto. */
+  let fSatisfaction = '';
+  /** '' = todos · 'yes' = solo tecnovigilancia · 'no' = sin tecnovigilancia. */
+  let fTecno = '';
+  /** Filtro por etapa dentro del apartado Tecnovigilancia. */
+  let fTecnoStage = '';
+
+  const SATISFACTION_FILTER_OPTIONS = [
+    { value: 'positive', label: 'Satisfechos (5-7)' },
+    { value: 'neutral', label: 'Neutrales (4)' },
+    { value: 'negative', label: 'Insatisfechos (1-3)' },
+    ...Object.values(SATISFACTION_BY_SCORE).map((s) => ({
+      value: String(s.score),
+      label: `${s.score} — ${s.label}`,
+    })),
+  ];
+
+  const TECNO_FILTER_OPTIONS = [
+    { value: 'yes', label: 'Solo tecnovigilancia' },
+    { value: 'no', label: 'Sin tecnovigilancia' },
+  ];
+
+  /** ¿La fila cae dentro del filtro de satisfacción elegido? */
+  function matchesSatisfaction(s: ServiceRow): boolean {
+    if (!fSatisfaction) return true;
+    const score = s.satisfaction_score ?? null;
+    if (score == null) return false;
+    const group = SATISFACTION_GROUP_META[fSatisfaction as keyof typeof SATISFACTION_GROUP_META];
+    if (group) return group.scores.includes(score as (typeof group.scores)[number]);
+    return score === Number(fSatisfaction);
+  }
 
   // Modal de "drill-down": lista de casos detrás de una tarjeta (KPI clicable).
   let modalOpen = false;
@@ -127,13 +225,6 @@
     modalRows = (services?.items ?? []).filter(filter);
     modalOpen = true;
   }
-
-  // Totales de satisfacción (caritas) sobre todos los casos del rango.
-  $: satCounts = {
-    bueno: (services?.items ?? []).filter((s) => s.satisfaction === 'bueno').length,
-    regular: (services?.items ?? []).filter((s) => s.satisfaction === 'regular').length,
-    malo: (services?.items ?? []).filter((s) => s.satisfaction === 'malo').length,
-  };
 
   // Reincidencia de equipos: un equipo con muchos casos en el rango "reincide".
   const RECURRENCE_MIN = 3;
@@ -163,20 +254,25 @@
     (s) =>
       (!fEngineer || s.engineer_name === fEngineer) &&
       (!fEquipment || s.equipment_label === fEquipment) &&
-      (!fType || s.type === fType),
+      (!fType || s.type === fType) &&
+      (!fTecno || (fTecno === 'yes' ? s.is_tecnovigilancia : !s.is_tecnovigilancia)) &&
+      matchesSatisfaction(s),
   );
+
+  $: filteredTecno = (tecno?.items ?? []).filter((r) => !fTecnoStage || r.stage === fTecnoStage);
 
   async function load() {
     loading = true;
     try {
       const range = { date_from: dateFrom, date_to: dateTo };
-      [compliance, prod, ops, eqReport, services, breakdown] = await Promise.all([
+      [compliance, prod, ops, eqReport, services, breakdown, tecno] = await Promise.all([
         reportsApi.compliance(),
         reportsApi.productivity(range),
         reportsApi.operations(range),
         reportsApi.equipment(range),
         reportsApi.services(range),
         reportsApi.breakdown(range),
+        reportsApi.tecnovigilancia(range),
       ]);
     } finally {
       loading = false;
@@ -265,25 +361,51 @@
           hint: 'FCR (First Call Resolution): % de casos resueltos completos “a la primera” — cerrados y completos ÷ total atendidos. Mientras más alto, mejor.',
         },
         {
-          label: `${SATISFACTION_META.bueno.emoji} Satisf. buena`,
-          value: satCounts.bueno,
+          label: 'Satisfacción prom.',
+          value: prod?.sat_avg != null ? `${prod.sat_avg} / 7` : '—',
+          tone: 'text-brand-700',
+          hint: `Promedio de la escala Likert de 7 puntos («${SATISFACTION_QUESTION}») sobre ${prod?.sat_count ?? 0} respuesta(s) de casos cerrados. 1 = Muy insatisfecho, 7 = Muy satisfecho.`,
+        },
+        {
+          label: 'Satisfechos (5-7)',
+          value: prod?.sat_positive ?? 0,
           tone: 'text-emerald-700',
-          hint: 'Casos calificados con satisfacción "Buena" por quien recibió el servicio. Haz clic para ver cuáles.',
-          drill: { title: 'Satisfacción buena', filter: (s: ServiceRow) => s.satisfaction === 'bueno' },
+          hint: `${SATISFACTION_GROUP_META.positive.hint} Equivale al ${satPositivePct}% de las respuestas. Haz clic para ver los casos.`,
+          drill: {
+            title: 'Satisfechos (5-7)',
+            filter: (s: ServiceRow) => (s.satisfaction_score ?? 0) >= 5,
+          },
         },
         {
-          label: `${SATISFACTION_META.regular.emoji} Satisf. regular`,
-          value: satCounts.regular,
-          tone: 'text-amber-700',
-          hint: 'Casos calificados con satisfacción "Regular". Haz clic para ver cuáles.',
-          drill: { title: 'Satisfacción regular', filter: (s: ServiceRow) => s.satisfaction === 'regular' },
+          label: 'Neutrales (4)',
+          value: prod?.sat_neutral ?? 0,
+          tone: 'text-slate-600',
+          hint: `${SATISFACTION_GROUP_META.neutral.hint} Haz clic para ver los casos.`,
+          drill: {
+            title: 'Neutrales (4)',
+            filter: (s: ServiceRow) => s.satisfaction_score === 4,
+          },
         },
         {
-          label: `${SATISFACTION_META.malo.emoji} Satisf. mala`,
-          value: satCounts.malo,
+          label: 'Insatisfechos (1-3)',
+          value: prod?.sat_negative ?? 0,
           tone: 'text-danger-700',
-          hint: 'Casos calificados con satisfacción "Mala". Haz clic para revisarlos.',
-          drill: { title: 'Satisfacción mala', filter: (s: ServiceRow) => s.satisfaction === 'malo' },
+          hint: `${SATISFACTION_GROUP_META.negative.hint} Son los casos a revisar primero. Haz clic para verlos.`,
+          drill: {
+            title: 'Insatisfechos (1-3)',
+            filter: (s: ServiceRow) =>
+              s.satisfaction_score != null && s.satisfaction_score <= 3,
+          },
+        },
+        {
+          label: 'Tecnovigilancia',
+          value: tecno?.total ?? 0,
+          tone: 'text-danger-700',
+          hint: 'Casos marcados como evento adverso o incidente en el que el equipo causó (o pudo causar) daño al paciente o al operador. Haz clic para ver cuáles.',
+          drill: {
+            title: 'Casos de tecnovigilancia',
+            filter: (s: ServiceRow) => s.is_tecnovigilancia,
+          },
         },
       ]
     : [];
@@ -496,7 +618,242 @@
       <Card title="FCR por ingeniero" description="% resueltos completos a la primera" icon={Gauge} accent="violet">
         <BarList data={engineerFcr} suffix="%" accent="#8b5cf6" />
       </Card>
+      <Card title="Satisfacción (escala 1-7)" description={SATISFACTION_QUESTION} icon={SmilePlus} accent="emerald">
+        <Donut data={satisfactionChart} unit="respuestas" />
+      </Card>
+      <Card title="Tecnovigilancia por etapa" description="Eventos adversos con el dispositivo" icon={ShieldAlert} accent="rose">
+        <Donut data={tecnoStageChart} unit="casos" size={130} />
+      </Card>
     </div>
+  </div>
+{:else if tab === 'satisfaccion'}
+  <!-- ══ SATISFACCIÓN (Likert 1-7) ══ -->
+  <div class="animate-fade-up space-y-4">
+    <Card
+      title={SATISFACTION_QUESTION}
+      description="Escala Likert de 7 puntos que responde quien recibe el servicio al cerrar el caso."
+      icon={SmilePlus}
+      accent="emerald"
+    >
+      {#if !prod || prod.sat_count === 0}
+        <EmptyState
+          icon={SmilePlus}
+          title="Sin calificaciones en el rango"
+          description="Ningún caso cerrado en estas fechas tiene calificación de satisfacción."
+        />
+      {:else}
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Promedio</p>
+            <p
+              class="mt-1 text-2xl font-bold tabular-nums"
+              style="color:{satisfactionColor(Math.round(prod.sat_avg ?? 4))}"
+            >
+              {prod.sat_avg ?? '—'} <span class="text-base text-slate-400">/ 7</span>
+            </p>
+            <p class="mt-0.5 text-xs text-slate-500">
+              {satisfactionLabel(Math.round(prod.sat_avg ?? 0))}
+            </p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Respuestas</p>
+            <p class="mt-1 text-2xl font-bold tabular-nums text-slate-800">{prod.sat_count}</p>
+            <p class="mt-0.5 text-xs text-slate-500">casos cerrados y calificados</p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">% satisfechos</p>
+            <p class="mt-1 text-2xl font-bold tabular-nums text-emerald-700">{satPositivePct}%</p>
+            <p class="mt-0.5 text-xs text-slate-500">calificaron 5, 6 o 7</p>
+          </div>
+          <div class="rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+            <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Insatisfechos</p>
+            <p class="mt-1 text-2xl font-bold tabular-nums text-danger-700">{prod.sat_negative}</p>
+            <p class="mt-0.5 text-xs text-slate-500">calificaron 1, 2 o 3</p>
+          </div>
+        </div>
+
+        <!-- Distribución punto a punto: la forma de la escala se lee de un vistazo -->
+        <div class="mt-5">
+          <h4 class="section-label mb-2">Distribución de la escala</h4>
+          <ul class="space-y-2">
+            {#each satisfactionChart as d}
+              {@const total = satisfactionChart.reduce((a, b) => a + b.value, 0) || 1}
+              <li>
+                <div class="mb-1 flex items-center justify-between gap-2 text-sm">
+                  <span class="truncate text-slate-700">{d.label}</span>
+                  <span class="shrink-0 tabular-nums text-slate-500">
+                    {d.value} · {Math.round((d.value / total) * 100)}%
+                  </span>
+                </div>
+                <div class="h-2.5 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    class="h-2.5 rounded-full transition-all"
+                    style="width:{(d.value / total) * 100}%;background:{d.color}"
+                  ></div>
+                </div>
+              </li>
+            {/each}
+          </ul>
+        </div>
+      {/if}
+    </Card>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <Card title="Satisfechos vs. insatisfechos" icon={PieChart} accent="emerald">
+        <Donut data={satisfactionGroupChart} unit="respuestas" />
+      </Card>
+      <Card
+        title="Satisfacción por ingeniero"
+        description="Promedio sobre 7 en el rango"
+        icon={Users}
+        accent="violet"
+      >
+        {#if !prod || prod.items.length === 0}
+          <EmptyState icon={Users} title="Sin datos" description="No hay casos atendidos en el rango." />
+        {:else}
+          <ul class="space-y-2">
+            {#each prod.items.filter((r) => r.sat_avg != null) as r}
+              <li>
+                <div class="mb-1 flex items-center justify-between gap-2 text-sm">
+                  <span class="truncate text-slate-700">{r.engineer_name}</span>
+                  <span class="shrink-0 tabular-nums text-slate-500">
+                    {r.sat_avg} / 7 · {r.sat_count} resp.
+                  </span>
+                </div>
+                <div class="h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    class="h-2 rounded-full"
+                    style="width:{((r.sat_avg ?? 0) / 7) * 100}%;background:{satisfactionColor(
+                      Math.round(r.sat_avg ?? 0),
+                    )}"
+                  ></div>
+                </div>
+              </li>
+            {:else}
+              <li class="value-pending text-sm">Ningún ingeniero tiene calificaciones en el rango.</li>
+            {/each}
+          </ul>
+        {/if}
+      </Card>
+    </div>
+  </div>
+{:else if tab === 'tecnovigilancia'}
+  <!-- ══ TECNOVIGILANCIA ══ -->
+  <div class="animate-fade-up space-y-4">
+    <div class="grid gap-3 sm:grid-cols-3">
+      <Card>
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Eventos en el rango</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-danger-700">{tecno?.total ?? 0}</p>
+      </Card>
+      <Card>
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Proceso abierto</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-amber-700">{tecno?.open_total ?? 0}</p>
+      </Card>
+      <Card>
+        <p class="text-xs font-medium uppercase tracking-wide text-slate-400">Cerrados</p>
+        <p class="mt-1 text-2xl font-bold tabular-nums text-emerald-700">
+          {(tecno?.total ?? 0) - (tecno?.open_total ?? 0)}
+        </p>
+      </Card>
+    </div>
+
+    <div class="grid gap-4 lg:grid-cols-2">
+      <Card title="Etapa del proceso" icon={PieChart} accent="rose">
+        <Donut data={tecnoStageChart} unit="casos" />
+      </Card>
+      <Card
+        title="Equipos con más eventos"
+        description="Dónde se concentra el riesgo"
+        icon={Stethoscope}
+        accent="amber"
+      >
+        {#if tecnoEquipmentBars.length === 0}
+          <EmptyState
+            icon={Stethoscope}
+            title="Sin eventos"
+            description="Ningún equipo registra tecnovigilancia en el rango."
+          />
+        {:else}
+          <BarList data={tecnoEquipmentBars} accent="#dc2626" />
+        {/if}
+      </Card>
+    </div>
+
+    <Card
+      title="Casos de tecnovigilancia"
+      description="Eventos adversos o incidentes en los que el equipo causó, o pudo causar, daño."
+      icon={ShieldAlert}
+      accent="rose"
+    >
+      <div class="mb-4 sm:max-w-xs">
+        <Select
+          bind:value={fTecnoStage}
+          options={TECNOVIGILANCIA_STAGE_OPTIONS}
+          placeholder="Todas las etapas"
+        />
+      </div>
+
+      {#if filteredTecno.length === 0}
+        <EmptyState
+          icon={ShieldAlert}
+          title="Sin casos de tecnovigilancia"
+          description="No hay eventos marcados en el rango y la etapa seleccionados. Se marcan desde el detalle de cada caso."
+        />
+      {:else}
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead class="text-left text-xs uppercase text-slate-500">
+              <tr class="border-b border-slate-200">
+                <th class="py-2 pr-3">Caso</th>
+                <th class="pr-3">Equipo</th>
+                <th class="pr-3">Unidad</th>
+                <th class="pr-3">Etapa</th>
+                <th class="pr-3">¿Qué pasó?</th>
+                <th class="pr-3">Ingeniero</th>
+                <th class="pr-3">Marcado</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-100">
+              {#each filteredTecno as r (r.case_id)}
+                {@const m = tecnovigilanciaStageMeta(r.stage)}
+                <tr>
+                  <td class="py-3 pr-3">
+                    <a class="font-mono text-xs font-semibold text-brand-700 hover:underline" href={`/cases/${r.code}`}>
+                      {r.code}
+                    </a>
+                    <div class="max-w-[200px] truncate text-slate-600" title={r.title}>{r.title}</div>
+                  </td>
+                  <td class="max-w-[170px] truncate pr-3 text-slate-600" title={r.equipment_label}>
+                    {r.equipment_label}
+                  </td>
+                  <td class="pr-3 text-slate-600">{r.sector_name ?? '—'}</td>
+                  <td class="whitespace-nowrap pr-3">
+                    {#if m}
+                      <span class="badge {m.tint} {m.text}">{m.label}</span>
+                    {:else}
+                      <span class="value-pending">Sin etapa</span>
+                    {/if}
+                  </td>
+                  <td class="max-w-[260px] truncate pr-3 text-slate-600" title={r.description ?? ''}>
+                    {#if r.description}{r.description}{:else}<span class="value-pending">Sin descripción</span>{/if}
+                  </td>
+                  <td class="pr-3 text-slate-600">
+                    {#if r.engineer_name}{r.engineer_name}{:else}<span class="value-pending">Sin asignar</span>{/if}
+                  </td>
+                  <td class="whitespace-nowrap pr-3 text-slate-500">
+                    {r.marked_at ? formatDate(r.marked_at) : formatDate(r.opened_at)}
+                  </td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+        <p class="mt-3 text-xs text-slate-400">
+          {filteredTecno.length} de {tecno?.total ?? 0} eventos en el rango
+          {#if (tecno?.total ?? 0) >= 300}· mostrando los 300 más recientes{/if}
+        </p>
+      {/if}
+    </Card>
   </div>
 {:else if tab === 'ingenieros'}
   <!-- ══ POR INGENIERO ══ -->
@@ -517,7 +874,10 @@
                 <th class="pr-3">A inicio</th>
                 <th class="pr-3">Trabajo</th>
                 <th class="pr-3">FCR</th>
-                <th class="pr-3" title="Satisfacción: bueno / regular / malo">Satisfacción</th>
+                <th class="pr-3" title={SATISFACTION_QUESTION}>Satisf. prom.</th>
+                <th class="pr-3" title="Satisfechos (5-7) / Neutrales (4) / Insatisfechos (1-3)">
+                  Reparto
+                </th>
                 <th class="pr-3"></th>
               </tr>
             </thead>
@@ -533,10 +893,23 @@
                   <td class="pr-3 tabular-nums text-slate-600">{h(r.avg_work_hours)}</td>
                   <td class="pr-3 tabular-nums text-brand-700">{r.fcr_pct}%</td>
                   <td class="pr-3 tabular-nums">
-                    <span class="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span class="text-emerald-700" title="Bueno">🙂 {r.sat_good}</span>
-                      <span class="text-amber-700" title="Regular">😐 {r.sat_regular}</span>
-                      <span class="text-danger-700" title="Malo">☹️ {r.sat_bad}</span>
+                    {#if r.sat_avg != null}
+                      <span
+                        class="inline-flex items-center gap-1.5 whitespace-nowrap font-semibold"
+                        style="color:{satisfactionColor(Math.round(r.sat_avg))}"
+                        title="{r.sat_count} respuesta(s)"
+                      >
+                        {r.sat_avg} / 7
+                      </span>
+                    {:else}
+                      <span class="value-pending">Sin calificar</span>
+                    {/if}
+                  </td>
+                  <td class="pr-3 tabular-nums">
+                    <span class="inline-flex items-center gap-2 whitespace-nowrap text-xs">
+                      <span class="text-emerald-700" title="Satisfechos (5-7)">▲ {r.sat_positive}</span>
+                      <span class="text-slate-500" title="Neutrales (4)">■ {r.sat_neutral}</span>
+                      <span class="text-danger-700" title="Insatisfechos (1-3)">▼ {r.sat_negative}</span>
                     </span>
                   </td>
                   <td class="pr-3">
@@ -627,10 +1000,16 @@
   <!-- ══ SERVICIOS (detalle) ══ -->
   <div class="animate-fade-up">
     <Card title="Historial de servicios" description="Cada servicio: qué se hizo, quién atendió y cuánto se demoró." icon={ClipboardList} accent="amber">
-      <div class="mb-4 grid gap-3 sm:grid-cols-3 lg:max-w-3xl">
+      <div class="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <Select bind:value={fEngineer} options={engineerOptions} placeholder="Todos los ingenieros" />
         <Select bind:value={fEquipment} options={equipmentOptions} placeholder="Todos los equipos" />
         <Select bind:value={fType} options={TYPE_OPTIONS} placeholder="Todos los tipos de actividad" />
+        <Select
+          bind:value={fSatisfaction}
+          options={SATISFACTION_FILTER_OPTIONS}
+          placeholder="Toda la satisfacción (1-7)"
+        />
+        <Select bind:value={fTecno} options={TECNO_FILTER_OPTIONS} placeholder="Tecnovigilancia: todos" />
       </div>
 
       {#if filteredServices.length === 0}
@@ -648,6 +1027,7 @@
                 <th class="pr-3">Qué se hizo</th>
                 <th class="pr-3">Respuesta</th>
                 <th class="pr-3">Trabajo</th>
+                <th class="pr-3" title={SATISFACTION_QUESTION}>Satisfacción</th>
                 <th class="pr-3">Resultado</th>
               </tr>
             </thead>
@@ -657,6 +1037,14 @@
                   <td class="whitespace-nowrap py-3 pr-3 text-slate-500">{formatDateTime(s.opened_at)}</td>
                   <td class="pr-3">
                     <a class="font-mono text-xs font-semibold text-brand-700 hover:underline" href={`/cases/${s.code}`}>{s.code}</a>
+                    {#if s.is_tecnovigilancia}
+                      <span
+                        class="badge ml-1 bg-danger-50 text-danger-700"
+                        title="Tecnovigilancia · {tecnovigilanciaStageLabel(s.tecnovigilancia_stage)}"
+                      >
+                        <ShieldAlert class="inline h-3 w-3" />
+                      </span>
+                    {/if}
                   </td>
                   <td class="max-w-[180px] truncate pr-3 text-slate-600" title={s.equipment_label}>{s.equipment_label}</td>
                   <td class="pr-3 text-slate-600">
@@ -668,6 +1056,24 @@
                   </td>
                   <td class="whitespace-nowrap pr-3 tabular-nums text-slate-600">{elapsedBetween(s.assigned_at, s.accepted_at)}</td>
                   <td class="whitespace-nowrap pr-3 tabular-nums text-slate-600">{elapsedBetween(s.work_started_at, s.finished_at)}</td>
+                  <td class="whitespace-nowrap pr-3">
+                    {#if s.satisfaction_score}
+                      <span
+                        class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700"
+                        title="{s.satisfaction_score} — {satisfactionLabel(s.satisfaction_score)}"
+                      >
+                        <span
+                          class="grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold text-white"
+                          style="background:{satisfactionColor(s.satisfaction_score)}"
+                        >
+                          {s.satisfaction_score}
+                        </span>
+                        {satisfactionLabel(s.satisfaction_score)}
+                      </span>
+                    {:else}
+                      <span class="value-pending">Sin calificar</span>
+                    {/if}
+                  </td>
                   <td class="pr-3">
                     {#if complLabel(s.completion)}
                       <span class="badge {s.completion === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}">
@@ -704,6 +1110,7 @@
             <th class="py-2 pr-3">Caso</th>
             <th class="pr-3">Equipo</th>
             <th class="pr-3">Tipo</th>
+            <th class="pr-3">Satisfacción</th>
             <th class="pr-3">Ingeniero</th>
             <th class="pr-3">Fecha</th>
           </tr>
@@ -717,6 +1124,24 @@
               </td>
               <td class="max-w-[160px] truncate pr-3 text-slate-600" title={s.equipment_label}>{s.equipment_label}</td>
               <td class="pr-3 text-slate-600">{typeLabel(s.type)}</td>
+              <td class="whitespace-nowrap pr-3">
+                {#if s.satisfaction_score}
+                  <span
+                    class="inline-flex items-center gap-1.5 text-xs font-medium text-slate-700"
+                    title="{s.satisfaction_score} — {satisfactionLabel(s.satisfaction_score)}"
+                  >
+                    <span
+                      class="grid h-5 w-5 place-items-center rounded-full text-[10px] font-bold text-white"
+                      style="background:{satisfactionColor(s.satisfaction_score)}"
+                    >
+                      {s.satisfaction_score}
+                    </span>
+                    {satisfactionLabel(s.satisfaction_score)}
+                  </span>
+                {:else}
+                  <span class="value-pending">—</span>
+                {/if}
+              </td>
               <td class="pr-3 text-slate-600">
                 {#if s.engineer_name}{s.engineer_name}{:else}<span class="value-pending">Sin asignar</span>{/if}
               </td>

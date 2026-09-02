@@ -36,9 +36,12 @@ export interface ProductivityRow {
   avg_work_hours: number | null;
   fcr_count: number;
   fcr_pct: number;
-  sat_good: number;
-  sat_regular: number;
-  sat_bad: number;
+  /** Satisfacción Likert 1-7 (solo casos cerrados y calificados). */
+  sat_count: number;
+  sat_avg: number | null;
+  sat_positive: number;
+  sat_neutral: number;
+  sat_negative: number;
 }
 
 export interface ProductivityReport {
@@ -48,9 +51,11 @@ export interface ProductivityReport {
   incomplete: number;
   fcr_count: number;
   fcr_pct: number;
-  sat_good: number;
-  sat_regular: number;
-  sat_bad: number;
+  sat_count: number;
+  sat_avg: number | null;
+  sat_positive: number;
+  sat_neutral: number;
+  sat_negative: number;
 }
 
 export interface DailyPoint {
@@ -107,7 +112,9 @@ export interface ServiceRow {
   type: string;
   status: string;
   completion: string | null;
-  satisfaction?: string | null;
+  satisfaction_score?: number | null;
+  is_tecnovigilancia: boolean;
+  tecnovigilancia_stage?: string | null;
   work_performed: string | null;
   operation_minutes: number | null;
   opened_at: string | null;
@@ -134,4 +141,30 @@ export interface BreakdownReport {
   by_priority: NamedCount[];
   by_sector: NamedCount[];
   monthly: NamedCount[];
+  /** Satisfacción Likert: siempre los 7 puntos, label = '1'…'7'. */
+  by_satisfaction: NamedCount[];
+}
+
+export interface TecnovigilanciaRow {
+  case_id: string;
+  code: string;
+  title: string;
+  equipment_label: string;
+  sector_name: string | null;
+  engineer_name: string | null;
+  status: string;
+  priority: string;
+  stage: string | null;
+  description: string | null;
+  marked_at: string | null;
+  opened_at: string | null;
+  closed_at: string | null;
+}
+
+export interface TecnovigilanciaReport {
+  items: TecnovigilanciaRow[];
+  total: number;
+  open_total: number;
+  by_stage: NamedCount[];
+  by_equipment: NamedCount[];
 }

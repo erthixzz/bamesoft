@@ -21,6 +21,7 @@ from app.modules.cases.schemas import (
     CaseActivityOut,
     CaseCreate,
     CaseOut,
+    CaseTecnovigilancia,
     CaseUpdate,
 )
 from app.modules.users.models import User
@@ -33,6 +34,7 @@ async def list_cases(
     status_: CaseStatus | None = Query(default=None, alias="status"),
     assigned_to: uuid.UUID | None = None,
     equipment_id: uuid.UUID | None = None,
+    tecnovigilancia: bool | None = Query(default=None),
     limit: int = 50,
     offset: int = 0,
     db: AsyncSession = Depends(get_session),
@@ -44,6 +46,7 @@ async def list_cases(
             status=status_,
             assigned_to=assigned_to,
             equipment_id=equipment_id,
+            tecnovigilancia=tecnovigilancia,
             scope=clinic_scope(current),
             limit=limit,
             offset=offset,
@@ -112,6 +115,23 @@ async def accept_case(
     current: User = Depends(require_engineer),
 ):
     return await service.accept_case(db, case_id, current.id, clinic_scope(current))
+
+
+@router.patch(
+    "/{case_id}/tecnovigilancia",
+    response_model=CaseOut,
+    dependencies=[Depends(requires("work", "cases"))],
+)
+async def set_tecnovigilancia(
+    case_id: uuid.UUID,
+    payload: CaseTecnovigilancia,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_engineer),
+):
+    """Marca (o desmarca) un caso ya creado como evento de tecnovigilancia."""
+    return await service.set_tecnovigilancia(
+        db, case_id, payload, current.id, clinic_scope(current)
+    )
 
 
 @router.get("/{case_id}/activities", response_model=list[CaseActivityOut])

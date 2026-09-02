@@ -62,12 +62,37 @@ class CaseCompletion(StrEnum):
     INCOMPLETE = "incomplete"
 
 
-class CaseSatisfaction(StrEnum):
-    """Satisfacción de quien recibe el servicio (3 caritas)."""
+class TecnovigilanciaStage(StrEnum):
+    """Etapa del proceso de tecnovigilancia (evento adverso con el dispositivo)."""
 
-    BUENO = "bueno"
-    REGULAR = "regular"
-    MALO = "malo"
+    DETECTION = "detection"
+    REPORT = "report"
+    INVESTIGATION = "investigation"
+    CORRECTIVE_ACTION = "corrective_action"
+    FOLLOW_UP = "follow_up"
+    CLOSED = "closed"
+
+
+# Satisfacción del servicio: escala Likert de 7 puntos (1 = Muy insatisfecho …
+# 7 = Muy satisfecho). Sustituye al enum de 3 caritas `case_satisfaction`, que
+# quedó obsoleto en la migración 0015 (ver infra/supabase/migrations).
+SATISFACTION_MIN = 1
+SATISFACTION_MAX = 7
+
+SATISFACTION_LABELS: dict[int, str] = {
+    1: "Muy insatisfecho",
+    2: "Insatisfecho",
+    3: "Algo insatisfecho",
+    4: "Neutral",
+    5: "Algo satisfecho",
+    6: "Satisfecho",
+    7: "Muy satisfecho",
+}
+
+#: Agrupación para KPIs: 5-7 positivo, 4 neutral, 1-3 negativo.
+SATISFACTION_POSITIVE = (5, 6, 7)
+SATISFACTION_NEUTRAL = (4,)
+SATISFACTION_NEGATIVE = (1, 2, 3)
 
 
 class AlertType(StrEnum):

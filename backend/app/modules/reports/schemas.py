@@ -47,10 +47,12 @@ class ProductivityRow(BaseModel):
     avg_work_hours: float | None = None  # inicio → fin
     fcr_count: int = 0  # resueltos completos a la primera (FCR)
     fcr_pct: float = 0.0
-    # Satisfacción de quien recibe el servicio (caritas), solo casos cerrados.
-    sat_good: int = 0
-    sat_regular: int = 0
-    sat_bad: int = 0
+    # Satisfacción (Likert 1-7) de quien recibe el servicio, solo casos cerrados.
+    sat_count: int = 0  # respuestas con calificación
+    sat_avg: float | None = None  # promedio sobre 7
+    sat_positive: int = 0  # 5-7 (algo satisfecho → muy satisfecho)
+    sat_neutral: int = 0  # 4 (neutral)
+    sat_negative: int = 0  # 1-3 (algo insatisfecho → muy insatisfecho)
 
 
 class ProductivityReport(BaseModel):
@@ -60,9 +62,11 @@ class ProductivityReport(BaseModel):
     incomplete: int = 0
     fcr_count: int = 0
     fcr_pct: float = 0.0
-    sat_good: int = 0
-    sat_regular: int = 0
-    sat_bad: int = 0
+    sat_count: int = 0
+    sat_avg: float | None = None
+    sat_positive: int = 0
+    sat_neutral: int = 0
+    sat_negative: int = 0
 
 
 class DailyPoint(BaseModel):
@@ -125,7 +129,10 @@ class ServiceRow(BaseModel):
     type: str
     status: str
     completion: str | None = None
-    satisfaction: str | None = None
+    #: Satisfacción en escala Likert de 7 puntos (1-7); None si aún sin calificar.
+    satisfaction_score: int | None = None
+    is_tecnovigilancia: bool = False
+    tecnovigilancia_stage: str | None = None
     work_performed: str | None = None
     operation_minutes: int | None = None
     opened_at: datetime | None = None
@@ -154,3 +161,35 @@ class BreakdownReport(BaseModel):
     by_priority: list[NamedCount] = Field(default_factory=list)
     by_sector: list[NamedCount] = Field(default_factory=list)
     monthly: list[NamedCount] = Field(default_factory=list)  # label = 'YYYY-MM'
+    #: Satisfacción Likert: label = '1'…'7'; siempre los 7 puntos (0 si no hay).
+    by_satisfaction: list[NamedCount] = Field(default_factory=list)
+
+
+class TecnovigilanciaRow(BaseModel):
+    """Un caso marcado como evento de tecnovigilancia."""
+
+    case_id: str
+    code: str
+    title: str
+    equipment_label: str
+    sector_name: str | None = None
+    engineer_name: str | None = None
+    status: str
+    priority: str
+    stage: str | None = None
+    description: str | None = None
+    marked_at: datetime | None = None
+    opened_at: datetime | None = None
+    closed_at: datetime | None = None
+
+
+class TecnovigilanciaReport(BaseModel):
+    """Casos de tecnovigilancia del rango, con su distribución por etapa."""
+
+    items: list[TecnovigilanciaRow] = Field(default_factory=list)
+    total: int = 0
+    #: Marcados pero aún no cerrados en el proceso de tecnovigilancia.
+    open_total: int = 0
+    by_stage: list[NamedCount] = Field(default_factory=list)
+    #: Equipos con más eventos de tecnovigilancia en el rango.
+    by_equipment: list[NamedCount] = Field(default_factory=list)

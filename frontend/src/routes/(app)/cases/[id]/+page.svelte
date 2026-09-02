@@ -37,6 +37,8 @@
   import SignaturePad from '$lib/components/SignaturePad.svelte';
   import CaseStatusBadge from '$lib/modules/cases/components/CaseStatusBadge.svelte';
   import PriorityBadge from '$lib/modules/cases/components/PriorityBadge.svelte';
+  import SatisfactionLikert from '$lib/modules/cases/components/SatisfactionLikert.svelte';
+  import TecnovigilanciaModal from '$lib/modules/cases/components/TecnovigilanciaModal.svelte';
   import CaseReportPrintable, {
     type CaseReport,
   } from '$lib/modules/cases/components/CaseReportPrintable.svelte';
@@ -49,14 +51,16 @@
   import { sectorsApi } from '$lib/modules/sectors/api';
   import { exportNodeToPdf } from '$lib/modules/cases/pdf';
   import type { Case, CaseActivity } from '$lib/modules/cases/types';
+  import type { SatisfactionScore } from '$lib/api/types';
   import type { Doc } from '$lib/modules/documents/types';
   import {
     TYPE_LABEL,
     TYPE_OPTIONS,
     COMPLETION_LABEL,
     COMPLETION_OPTIONS,
-    SATISFACTION_ORDER,
-    SATISFACTION_META,
+    SATISFACTION_QUESTION,
+    satisfactionFull,
+    TECNOVIGILANCIA_STAGE_META,
     STATUS_META,
     PRIORITY_META,
     elapsedBetween,
@@ -94,9 +98,12 @@
   let fPartsCount = '';
   let fPartsDetail = '';
   let fCompletion = '';
-  let fSatisfaction: '' | 'bueno' | 'regular' | 'malo' = '';
+  let fSatisfaction: SatisfactionScore | null = null;
   let fReceiverName = '';
   let fReceiverDoc = '';
+
+  // Modal de tecnovigilancia (marcar el caso como evento adverso).
+  let tecnoOpen = false;
 
   let sigPad: SignaturePad;
   let sigDrawn = false;
@@ -158,7 +165,7 @@
     fPartsCount = x.parts_count != null ? String(x.parts_count) : '';
     fPartsDetail = x.parts_detail ?? '';
     fCompletion = x.completion ?? '';
-    fSatisfaction = x.satisfaction ?? '';
+    fSatisfaction = x.satisfaction_score ?? null;
     fReceiverName = x.receiver_name ?? '';
     fReceiverDoc = x.receiver_doc ?? '';
   }
@@ -300,7 +307,7 @@
         parts_count: fPartsCount.trim() ? Number(fPartsCount) : null,
         parts_detail: fPartsDetail.trim() || null,
         completion: (fCompletion || null) as Case['completion'],
-        satisfaction: (fSatisfaction || null) as Case['satisfaction'],
+        satisfaction_score: fSatisfaction,
         receiver_name: fReceiverName.trim() || null,
         receiver_doc: fReceiverDoc.trim() || null,
         signature_path,
@@ -358,8 +365,13 @@
       typeLabel: TYPE_LABEL[c.type],
       priorityLabel: PRIORITY_META[c.priority].label,
       completionLabel: c.completion ? COMPLETION_LABEL[c.completion] : '—',
-      satisfactionLabel: c.satisfaction ? SATISFACTION_META[c.satisfaction].label : '—',
-      satisfactionEmoji: c.satisfaction ? SATISFACTION_META[c.satisfaction].emoji : '',
+      satisfactionQuestion: SATISFACTION_QUESTION,
+      satisfactionLabel: satisfactionFull(c.satisfaction_score),
+      satisfactionScore: c.satisfaction_score ?? null,
+      tecnovigilanciaStage: c.is_tecnovigilancia
+        ? TECNOVIGILANCIA_STAGE_META[c.tecnovigilancia_stage ?? 'detection'].label
+        : null,
+      tecnovigilanciaDescription: c.tecnovigilancia_description ?? '—',
       title: c.title,
       description: c.description ?? '—',
       equipmentLabel,
@@ -459,6 +471,11 @@
               {COMPLETION_LABEL[c.completion]}
             </span>
           {/if}
+          {#if c.is_tecnovigilancia}
+            <span class="badge bg-danger-50 text-danger-700">
+              <ShieldAlert class="mr-1 inline h-3 w-3" /> Tecnovigilancia
+            </span>
+          {/if}
         </div>
       </div>
 
@@ -553,29 +570,12 @@
 
           <h4 class="section-label mt-6 mb-2">Recibido a satisfacción</h4>
 
-          <div class="mb-4">
-            <span class="mb-1.5 block text-sm font-medium text-slate-600">
-              Satisfacción del servicio <span class="font-semibold text-danger-500">*</span>
-            </span>
-            <div class="grid grid-cols-3 gap-2 sm:max-w-md">
-              {#each SATISFACTION_ORDER as s (s)}
-                <button
-                  type="button"
-                  on:click={() => (fSatisfaction = fSatisfaction === s ? '' : s)}
-                  class="flex flex-col items-center gap-1 rounded-xl border px-2 py-3 transition
-                    {fSatisfaction === s
-                      ? `${SATISFACTION_META[s].tint} ${SATISFACTION_META[s].text} border-current shadow-sm`
-                      : 'border-slate-200 text-slate-400 hover:border-slate-300 hover:bg-slate-50'}"
-                  aria-pressed={fSatisfaction === s}
-                >
-                  <span class="text-2xl leading-none">{SATISFACTION_META[s].emoji}</span>
-                  <span class="text-xs font-semibold">{SATISFACTION_META[s].label}</span>
-                </button>
-              {/each}
-            </div>
-            {#if errors.fSatisfaction}
-              <p class="mt-1 text-xs text-danger-600">{errors.fSatisfaction}</p>
-            {/if}
+          <div class="mb-4 sm:max-w-xl">
+            <SatisfactionLikert
+              bind:value={fSatisfaction}
+              required
+              error={errors.fSatisfaction}
+            />
           </div>
 
           <div class="grid gap-3 sm:grid-cols-2">
@@ -701,6 +701,49 @@
         </ol>
       </Card>
 
+      <!-- Tecnovigilancia: ¿el equipo causó daño al paciente o al operador? -->
+      <Card
+        title="Tecnovigilancia"
+        description="Eventos adversos o incidentes con el dispositivo"
+        icon={ShieldAlert}
+        accent={c.is_tecnovigilancia ? 'rose' : 'slate'}
+      >
+        {#if c.is_tecnovigilancia}
+          {@const m = TECNOVIGILANCIA_STAGE_META[c.tecnovigilancia_stage ?? 'detection']}
+          <div class="mb-3 flex flex-wrap items-center gap-2">
+            <span class="badge bg-danger-50 text-danger-700">
+              <ShieldAlert class="mr-1 inline h-3 w-3" /> Caso de tecnovigilancia
+            </span>
+            <span class="badge {m.tint} {m.text}">Etapa: {m.label}</span>
+          </div>
+          <p class="mb-1 text-xs text-slate-400">{m.description}</p>
+          {#if c.tecnovigilancia_description}
+            <p class="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-600">
+              {c.tecnovigilancia_description}
+            </p>
+          {:else}
+            <p class="value-pending mt-2 text-sm">Sin descripción del evento.</p>
+          {/if}
+          {#if c.tecnovigilancia_at}
+            <p class="mt-2 text-xs text-slate-400">Marcado el {formatDateTime(c.tecnovigilancia_at)}</p>
+          {/if}
+        {:else}
+          <p class="text-sm text-slate-500">
+            Si el paciente o el operador sufrió —o pudo sufrir— un daño por este equipo, márcalo
+            como caso de tecnovigilancia e indica en qué etapa va el proceso.
+          </p>
+        {/if}
+
+        {#if isEngineer}
+          <div class="mt-3">
+            <Button variant="secondary" on:click={() => (tecnoOpen = true)}>
+              <ShieldAlert class="h-4 w-4" />
+              {c.is_tecnovigilancia ? 'Editar tecnovigilancia' : 'Marcar tecnovigilancia'}
+            </Button>
+          </div>
+        {/if}
+      </Card>
+
       <Card title="Añadir nota" icon={MessageSquarePlus} accent="brand">
         <Input bind:value={newNote} placeholder="Escribe una nota…" />
         <div class="mt-3"><Button on:click={addNote}>Añadir</Button></div>
@@ -717,6 +760,8 @@
       </Card>
     </div>
   </div>
+
+  <TecnovigilanciaModal bind:open={tecnoOpen} value={c} on:saved={reload} />
 
   <!-- Nodo imprimible (fuera de pantalla) para generar el PDF branded -->
   <div class="pointer-events-none fixed -left-[9999px] top-0" aria-hidden="true">

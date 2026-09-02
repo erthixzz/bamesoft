@@ -13,7 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import BadRequest, NotFound
 from app.db.enums import CaseStatus
 from app.modules.cases.models import Case, CaseActivity
-from app.modules.cases.schemas import CaseActivityIn, CaseCreate, CaseUpdate
+from app.modules.cases.schemas import (
+    CaseActivityIn,
+    CaseCreate,
+    CaseTecnovigilancia,
+    CaseUpdate,
+)
 from app.modules.equipment.models import Equipment
 
 
@@ -27,6 +32,7 @@ async def list_cases(
     status: CaseStatus | None = None,
     assigned_to: uuid.UUID | None = None,
     equipment_id: uuid.UUID | None = None,
+    tecnovigilancia: bool | None = None,
     scope: uuid.UUID | None = None,
     limit: int = 50,
     offset: int = 0,
@@ -43,6 +49,8 @@ async def list_cases(
         stmt = stmt.where(Case.assigned_to == assigned_to)
     if equipment_id:
         stmt = stmt.where(Case.equipment_id == equipment_id)
+    if tecnovigilancia is not None:
+        stmt = stmt.where(Case.is_tecnovigilancia.is_(tecnovigilancia))
     stmt = stmt.limit(limit).offset(offset)
     return (await db.execute(stmt)).scalars().all()
 
@@ -143,7 +151,7 @@ async def update_case(
         obj.closed_at = None
         obj.finished_at = None
         obj.completion = None
-        obj.satisfaction = None
+        obj.satisfaction_score = None
     if new_status == CaseStatus.IN_PROGRESS and obj.work_started_at is None:
         obj.work_started_at = now
     if data.get("assigned_to") and obj.status == CaseStatus.OPEN:
@@ -163,6 +171,49 @@ async def update_case(
             author_id=actor_id,
             action="updated",
             notes=", ".join(f"{k}={v}" for k, v in data.items() if k not in _hidden),
+        )
+    )
+    await db.flush()
+    await db.refresh(obj)
+    return obj
+
+
+async def set_tecnovigilancia(
+    db: AsyncSession,
+    case_id: uuid.UUID,
+    payload: CaseTecnovigilancia,
+    actor_id: uuid.UUID,
+    scope: uuid.UUID | None = None,
+) -> Case:
+    """Marca (o desmarca) el caso como evento de tecnovigilancia.
+
+    Al desmarcar se limpian etapa y descripción para no dejar datos huérfanos
+    de un marcado anterior (la BD lo exige con un check constraint).
+    """
+    obj = await get_case(db, case_id, scope)
+    was = obj.is_tecnovigilancia
+
+    if payload.is_tecnovigilancia:
+        description = (payload.description or "").strip() or None
+        obj.is_tecnovigilancia = True
+        obj.tecnovigilancia_stage = payload.stage
+        obj.tecnovigilancia_description = description
+        if obj.tecnovigilancia_at is None:
+            obj.tecnovigilancia_at = datetime.now(UTC)
+        note = f"tecnovigilancia=sí, tecnovigilancia_stage={payload.stage.value}"
+    else:
+        obj.is_tecnovigilancia = False
+        obj.tecnovigilancia_stage = None
+        obj.tecnovigilancia_description = None
+        obj.tecnovigilancia_at = None
+        note = "tecnovigilancia=no"
+
+    db.add(
+        CaseActivity(
+            case_id=obj.id,
+            author_id=actor_id,
+            action="tecnovigilancia" if payload.is_tecnovigilancia and not was else "updated",
+            notes=note,
         )
     )
     await db.flush()

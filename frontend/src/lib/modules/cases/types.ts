@@ -1,9 +1,10 @@
 import type {
   CaseCompletion,
   CasePriority,
-  CaseSatisfaction,
   CaseStatus,
   CaseType,
+  SatisfactionScore,
+  TecnovigilanciaStage,
 } from '$lib/api/types';
 
 /** Campos del soporte/cierre del servicio (compartidos entre Case y CaseUpdate). */
@@ -13,7 +14,8 @@ export interface CaseResolution {
   parts_count?: number | null;
   parts_detail?: string | null;
   completion?: CaseCompletion | null;
-  satisfaction?: CaseSatisfaction | null;
+  /** Satisfacción del servicio en escala Likert de 7 puntos. */
+  satisfaction_score?: SatisfactionScore | null;
   receiver_name?: string | null;
   receiver_doc?: string | null;
   signature_path?: string | null;
@@ -38,8 +40,20 @@ export interface Case extends CaseResolution {
   accepted_at?: string | null;
   work_started_at?: string | null;
   finished_at?: string | null;
+  /** Tecnovigilancia: el caso es un evento adverso / incidente con el equipo. */
+  is_tecnovigilancia: boolean;
+  tecnovigilancia_stage?: TecnovigilanciaStage | null;
+  tecnovigilancia_description?: string | null;
+  tecnovigilancia_at?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Payload de `PATCH /cases/{id}/tecnovigilancia`. */
+export interface CaseTecnovigilancia {
+  is_tecnovigilancia: boolean;
+  stage?: TecnovigilanciaStage | null;
+  description?: string | null;
 }
 
 export interface CaseCreate {

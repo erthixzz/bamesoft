@@ -6,6 +6,7 @@ from datetime import date
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.enums import SATISFACTION_MAX, SATISFACTION_MIN, TecnovigilanciaStage
 from app.db.session import get_session
 from app.modules.auth.deps import clinic_scope, require_authenticated
 from app.modules.reports import service
@@ -17,6 +18,7 @@ from app.modules.reports.schemas import (
     OperationsReport,
     ProductivityReport,
     ServicesReport,
+    TecnovigilanciaReport,
 )
 from app.modules.users.models import User
 
@@ -76,12 +78,37 @@ async def services_report(
     date_to: date | None = Query(default=None),
     engineer_id: uuid.UUID | None = Query(default=None),
     equipment_id: uuid.UUID | None = Query(default=None),
+    satisfaction_min: int | None = Query(default=None, ge=SATISFACTION_MIN, le=SATISFACTION_MAX),
+    satisfaction_max: int | None = Query(default=None, ge=SATISFACTION_MIN, le=SATISFACTION_MAX),
+    tecnovigilancia: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_session),
     current: User = Depends(require_authenticated),
 ):
     """Detalle servicio a servicio: qué se hizo, quién y cuánto se demoró."""
     return await service.services_report(
-        db, date_from, date_to, clinic_scope(current), engineer_id, equipment_id
+        db,
+        date_from,
+        date_to,
+        clinic_scope(current),
+        engineer_id,
+        equipment_id,
+        satisfaction_min,
+        satisfaction_max,
+        tecnovigilancia,
+    )
+
+
+@router.get("/tecnovigilancia", response_model=TecnovigilanciaReport)
+async def tecnovigilancia_report(
+    date_from: date | None = Query(default=None),
+    date_to: date | None = Query(default=None),
+    stage: TecnovigilanciaStage | None = Query(default=None),
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_authenticated),
+):
+    """Casos de tecnovigilancia del rango, con su distribución por etapa."""
+    return await service.tecnovigilancia_report(
+        db, date_from, date_to, clinic_scope(current), stage
     )
 
 

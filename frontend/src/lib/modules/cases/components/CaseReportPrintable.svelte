@@ -11,9 +11,14 @@
     typeLabel: string;
     priorityLabel: string;
     completionLabel: string;
-    /** Satisfacción del servicio (carita). */
+    /** Pregunta de satisfacción, tal cual se le hizo a quien recibe. */
+    satisfactionQuestion: string;
+    /** «5 — Algo satisfecho» (Likert de 7 puntos) o '—' si no calificó. */
     satisfactionLabel: string;
-    satisfactionEmoji: string;
+    satisfactionScore: number | null;
+    /** Etapa de tecnovigilancia, o `null` si el caso no es de tecnovigilancia. */
+    tecnovigilanciaStage: string | null;
+    tecnovigilanciaDescription: string;
     title: string;
     description: string;
     equipmentLabel: string;
@@ -42,6 +47,19 @@
   export let report: CaseReport;
 
   const txt = (v: string | null | undefined) => (v === null || v === undefined || v === '' ? '—' : v);
+
+  // Color del puntaje Likert (rojo → gris → verde) para que el soporte impreso
+  // se lea de un vistazo, sin depender de emojis ni de fuentes con iconos.
+  const SAT_COLORS: Record<number, string> = {
+    1: '#b91c1c',
+    2: '#ef4444',
+    3: '#f97316',
+    4: '#94a3b8',
+    5: '#84cc16',
+    6: '#22c55e',
+    7: '#059669',
+  };
+  $: satColor = report.satisfactionScore ? SAT_COLORS[report.satisfactionScore] : '#94a3b8';
 </script>
 
 <div
@@ -136,6 +154,23 @@
     </div>
   {/each}
 
+  <!-- Tecnovigilancia (solo si el caso está marcado como evento adverso) -->
+  {#if report.tecnovigilanciaStage}
+    <div style="margin-top:12px;border:1px solid #fecaca;border-radius:8px;overflow:hidden;">
+      <div style="background:#dc2626;color:#fff;font-weight:700;font-size:11px;padding:5px 10px;text-transform:uppercase;letter-spacing:.04em;">
+        Tecnovigilancia · Evento adverso con el dispositivo
+      </div>
+      <div style="display:flex;border-top:1px solid #fee2e2;">
+        <div style="width:21%;background:#fef2f2;color:#991b1b;font-weight:600;padding:5px 8px;">Etapa del proceso</div>
+        <div style="flex:1;padding:5px 8px;font-weight:600;">{txt(report.tecnovigilanciaStage)}</div>
+      </div>
+      <div style="display:flex;border-top:1px solid #fee2e2;">
+        <div style="width:21%;background:#fef2f2;color:#991b1b;font-weight:600;padding:5px 8px;">¿Qué pasó?</div>
+        <div style="flex:1;padding:5px 8px;white-space:pre-wrap;">{txt(report.tecnovigilanciaDescription)}</div>
+      </div>
+    </div>
+  {/if}
+
   <!-- Evidencias fotográficas -->
   {#if report.photos.length}
     <div style="margin-top:12px;border:1px solid #cbd5e1;border-radius:8px;overflow:hidden;">
@@ -166,9 +201,17 @@
           <div style="flex:1;padding:5px 8px;">{txt(report.receiverDoc)}</div>
         </div>
         <div style="display:flex;border:1px solid #e2e8f0;border-radius:6px;overflow:hidden;align-items:center;">
-          <div style="width:42%;background:#f8fafc;color:#475569;font-weight:600;padding:5px 8px;">Satisfacción</div>
-          <div style="flex:1;padding:5px 8px;font-weight:600;">
-            {#if report.satisfactionEmoji}<span style="font-size:16px;">{report.satisfactionEmoji}</span> {/if}{txt(report.satisfactionLabel)}
+          <div style="width:42%;background:#f8fafc;color:#475569;font-weight:600;padding:5px 8px;">
+            {txt(report.satisfactionQuestion)}
+          </div>
+          <div style="flex:1;padding:5px 8px;font-weight:600;display:flex;align-items:center;gap:6px;">
+            {#if report.satisfactionScore}
+              <span style="display:inline-block;min-width:18px;height:18px;line-height:18px;text-align:center;border-radius:9px;background:{satColor};color:#fff;font-size:11px;font-weight:800;">
+                {report.satisfactionScore}
+              </span>
+            {/if}
+            <span>{txt(report.satisfactionLabel)}</span>
+            <span style="color:#94a3b8;font-weight:500;font-size:9.5px;">(escala 1 a 7)</span>
           </div>
         </div>
       </div>
