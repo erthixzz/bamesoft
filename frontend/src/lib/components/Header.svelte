@@ -112,7 +112,7 @@
           <Building2 class="h-3.5 w-3.5" />
         </span>
         <span class="max-w-[180px] truncate text-sm font-semibold text-brand-800">
-          {$profile.clinic_name ?? 'Elegir compañía'}
+          {$profile.clinic_name ?? 'Todas las compañías'}
         </span>
         <ChevronDown class="h-3.5 w-3.5 shrink-0 text-brand-400" />
       </button>

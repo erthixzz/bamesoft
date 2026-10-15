@@ -5,7 +5,7 @@
    *  Responsive: popover anclado en escritorio, hoja centrada en móvil.
    */
   import { onMount, tick, createEventDispatcher } from 'svelte';
-  import { Calendar, ChevronLeft, ChevronRight, Clock, X, Minus, Plus } from 'lucide-svelte';
+  import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Clock, X, Minus, Plus } from 'lucide-svelte';
   import { portal } from '$lib/actions/portal';
 
   const dispatch = createEventDispatcher<{ change: string }>();
@@ -33,6 +33,13 @@
   let hh = 8;
   let mm = 0;
   let timeInput = '08:00';
+
+  /** Vista activa del popover. Navegar de año en año con la flecha de mes
+   *  obligaba a ~160 clics para una fecha de fabricación de 2012. */
+  type View = 'days' | 'months' | 'years';
+  let view: View = 'days';
+  const YEARS_PAGE = 12;
+  let yearFrom = viewYear - 6; // primer año del bloque visible
 
   const WEEKDAYS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
   const MONTHS = [
@@ -194,12 +201,64 @@
     if (viewMonth === 11) { viewMonth = 0; viewYear++; } else viewMonth++;
   }
 
+  // ---- Navegación por mes y año ----
+  /** La flecha avanza lo que la vista muestra: un mes, un año o un bloque. */
+  function step(dir: -1 | 1) {
+    if (view === 'days') return dir === -1 ? prevMonth() : nextMonth();
+    if (view === 'months') viewYear += dir;
+    else yearFrom += dir * YEARS_PAGE;
+  }
+
+  /** El título cicla día → mes → año, y vuelve a la cuadrícula desde arriba. */
+  async function cycleView() {
+    if (view === 'days') {
+      view = 'months';
+    } else if (view === 'months') {
+      yearFrom = viewYear - 6;
+      view = 'years';
+    } else {
+      view = 'days';
+    }
+    await position();
+  }
+
+  async function pickMonth(m: number) {
+    viewMonth = m;
+    view = 'days';
+    await position();
+  }
+
+  async function pickYear(y: number) {
+    viewYear = y;
+    view = 'months';
+    await position();
+  }
+
+  /** Meses y años enteros por debajo de `min` no se pueden elegir. */
+  function monthOff(y: number, m: number, isoMin: string | null) {
+    if (!isoMin) return false;
+    const [my, mo] = isoMin.split('-').map(Number);
+    return y < my || (y === my && m < mo - 1);
+  }
+  function yearOff(y: number, isoMin: string | null) {
+    return isoMin ? y < Number(isoMin.split('-')[0]) : false;
+  }
+
+  $: headerLabel =
+    view === 'days'
+      ? `${MONTHS[viewMonth]} ${viewYear}`
+      : view === 'months'
+        ? String(viewYear)
+        : `${yearFrom} – ${yearFrom + YEARS_PAGE - 1}`;
+
   // ---- Apertura / posicionamiento ----
   function syncFromValue() {
     const p = parse(value);
     const t = new Date();
     viewYear = p?.y ?? t.getFullYear();
     viewMonth = p?.m ?? t.getMonth();
+    yearFrom = viewYear - 6;
+    view = 'days'; // cada apertura empieza por el calendario
     if (p) { hh = p.hh; mm = p.mm; }
     timeInput = `${pad(hh)}:${pad(mm)}`;
   }
@@ -320,44 +379,93 @@
         {sheet ? 'fixed bottom-3 left-1/2 max-h-[90vh] -translate-x-1/2 overflow-y-auto' : 'fixed'}"
       style={sheet ? 'z-index:9999;' : `top:${popTop}px; left:${popLeft}px; z-index:9999;`}
     >
-      <!-- Cabecera de mes -->
+      <!-- Cabecera: el título cicla día → mes → año -->
       <header class="mb-2 flex items-center justify-between">
-        <button type="button" class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" on:click={prevMonth} aria-label="Mes anterior">
+        <button type="button" class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" on:click={() => step(-1)} aria-label="Anterior">
           <ChevronLeft class="h-4 w-4" />
         </button>
-        <p class="text-sm font-semibold text-slate-800">{MONTHS[viewMonth]} {viewYear}</p>
-        <button type="button" class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" on:click={nextMonth} aria-label="Mes siguiente">
+        <button
+          type="button"
+          class="flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-semibold text-slate-800 transition hover:bg-brand-50 hover:text-brand-700"
+          on:click={cycleView}
+          aria-label="Cambiar entre día, mes y año"
+        >
+          {headerLabel}
+          <ChevronDown class="h-3.5 w-3.5 text-slate-400" />
+        </button>
+        <button type="button" class="rounded-lg p-1.5 text-slate-500 transition hover:bg-slate-100" on:click={() => step(1)} aria-label="Siguiente">
           <ChevronRight class="h-4 w-4" />
         </button>
       </header>
 
-      <!-- Días de la semana -->
-      <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-        {#each WEEKDAYS as w}<div>{w}</div>{/each}
-      </div>
+      {#if view === 'days'}
+        <!-- Días de la semana -->
+        <div class="grid grid-cols-7 gap-1 text-center text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+          {#each WEEKDAYS as w}<div>{w}</div>{/each}
+        </div>
 
-      <!-- Cuadrícula -->
-      <div class="mt-1 grid grid-cols-7 gap-1">
-        {#each grid as cell}
-          <button
-            type="button"
-            disabled={cell.off}
-            on:click={() => pickDay(cell)}
-            class="grid h-9 w-full place-items-center rounded-lg text-sm font-medium transition
-              {cell.selected
-                ? 'bg-brand-600 text-white shadow ring-2 ring-brand-200 hover:bg-brand-700'
-                : cell.off
-                  ? 'cursor-not-allowed text-slate-300'
-                  : !cell.current
-                    ? 'text-slate-300 hover:bg-slate-100'
-                    : cell.today
-                      ? 'text-brand-700 ring-1 ring-brand-300 hover:bg-brand-50'
-                      : 'text-slate-700 hover:bg-brand-50'}"
-          >
-            {cell.day}
-          </button>
-        {/each}
-      </div>
+        <!-- Cuadrícula -->
+        <div class="mt-1 grid grid-cols-7 gap-1">
+          {#each grid as cell}
+            <button
+              type="button"
+              disabled={cell.off}
+              on:click={() => pickDay(cell)}
+              class="grid h-9 w-full place-items-center rounded-lg text-sm font-medium transition
+                {cell.selected
+                  ? 'bg-brand-600 text-white shadow ring-2 ring-brand-200 hover:bg-brand-700'
+                  : cell.off
+                    ? 'cursor-not-allowed text-slate-300'
+                    : !cell.current
+                      ? 'text-slate-300 hover:bg-slate-100'
+                      : cell.today
+                        ? 'text-brand-700 ring-1 ring-brand-300 hover:bg-brand-50'
+                        : 'text-slate-700 hover:bg-brand-50'}"
+            >
+              {cell.day}
+            </button>
+          {/each}
+        </div>
+      {:else if view === 'months'}
+        <div class="grid grid-cols-3 gap-1.5">
+          {#each MONTHS as name, m}
+            {@const off = monthOff(viewYear, m, min)}
+            <button
+              type="button"
+              disabled={off}
+              on:click={() => pickMonth(m)}
+              class="grid h-11 w-full place-items-center rounded-lg text-sm font-medium transition
+                {m === viewMonth
+                  ? 'bg-brand-600 text-white shadow ring-2 ring-brand-200 hover:bg-brand-700'
+                  : off
+                    ? 'cursor-not-allowed text-slate-300'
+                    : 'text-slate-700 hover:bg-brand-50'}"
+            >
+              {name.slice(0, 3)}
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="grid grid-cols-3 gap-1.5">
+          {#each Array(YEARS_PAGE) as _, i}
+            {@const y = yearFrom + i}
+            {@const off = yearOff(y, min)}
+            <button
+              type="button"
+              disabled={off}
+              on:click={() => pickYear(y)}
+              class="grid h-11 w-full place-items-center rounded-lg text-sm font-medium tabular-nums transition
+                {y === viewYear
+                  ? 'bg-brand-600 text-white shadow ring-2 ring-brand-200 hover:bg-brand-700'
+                  : off
+                    ? 'cursor-not-allowed text-slate-300'
+                    : 'text-slate-700 hover:bg-brand-50'}"
+            >
+              {y}
+            </button>
+          {/each}
+        </div>
+      {/if}
 
       <!-- Hora (solo datetime) -->
       {#if mode === 'datetime'}

@@ -17,7 +17,13 @@ from app.modules.auth.deps import (
 from app.modules.documents.schemas import SignedUrlOut
 from app.modules.users import service
 from app.modules.users.models import User
-from app.modules.users.schemas import UserCreate, UserInvite, UserOut, UserUpdate
+from app.modules.users.schemas import (
+    PasswordChange,
+    UserCreate,
+    UserInvite,
+    UserOut,
+    UserUpdate,
+)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -38,6 +44,20 @@ async def list_users(
 @router.get("/me", response_model=UserOut)
 async def me(current: User = Depends(require_authenticated)) -> User:
     return current
+
+
+@router.post("/me/password", response_model=UserOut)
+async def change_my_password(
+    payload: PasswordChange,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_authenticated),
+) -> User:
+    """Cambia la contraseña del usuario autenticado.
+
+    Sin `requires(...)`: cualquier rol debe poder cambiar su propia contraseña —
+    de hecho el operario no puede hacer nada más hasta que la cambie.
+    """
+    return await service.change_own_password(db, current, payload.new_password)
 
 
 @router.get("/{user_id}", response_model=UserOut)

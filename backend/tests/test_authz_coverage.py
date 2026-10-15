@@ -27,6 +27,12 @@ MUTATING = {"POST", "PUT", "PATCH", "DELETE"}
 # Rutas que legítimamente no llevan guard. Añadir aquí exige justificarlo.
 EXEMPT_PATHS: dict[str, str] = {
     "/api/v1/auth/login": "el login es la puerta de entrada: aún no hay usuario",
+    "/api/v1/users/me/password": (
+        "cambiar la PROPIA contraseña no puede depender de la matriz de "
+        "capacidades: el operario llega aquí obligado en su primer acceso y "
+        "no puede hacer nada más hasta cambiarla. Opera solo sobre el usuario "
+        "autenticado (no recibe id), así que no hay nada que escalar."
+    ),
 }
 
 

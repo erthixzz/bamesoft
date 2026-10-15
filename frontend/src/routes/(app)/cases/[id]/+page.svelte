@@ -98,6 +98,7 @@
   let fPartsCount = '';
   let fPartsDetail = '';
   let fCompletion = '';
+  let fIncompleteReason = '';
   let fSatisfaction: SatisfactionScore | null = null;
   let fReceiverName = '';
   let fReceiverDoc = '';
@@ -165,6 +166,7 @@
     fPartsCount = x.parts_count != null ? String(x.parts_count) : '';
     fPartsDetail = x.parts_detail ?? '';
     fCompletion = x.completion ?? '';
+    fIncompleteReason = x.incomplete_reason ?? '';
     fSatisfaction = x.satisfaction_score ?? null;
     fReceiverName = x.receiver_name ?? '';
     fReceiverDoc = x.receiver_doc ?? '';
@@ -283,6 +285,9 @@
       e.fOperation = 'Indica el tiempo de operación';
     if (!fWork.trim()) e.fWork = 'Describe la actividad realizada';
     if (!fCompletion) e.fCompletion = 'Indica el estado final (completo/incompleto)';
+    // Un cierre incompleto sin motivo deja el soporte firmado sin explicar.
+    if (fCompletion === 'incomplete' && !fIncompleteReason.trim())
+      e.fIncompleteReason = 'Explica por qué el servicio quedó incompleto';
     if (close) {
       if (!fSatisfaction) e.fSatisfaction = 'Selecciona la satisfacción del servicio';
       if (!fReceiverName.trim()) e.fReceiverName = 'Nombre de quien recibe';
@@ -309,6 +314,7 @@
         parts_count: fPartsCount.trim() ? Number(fPartsCount) : null,
         parts_detail: fPartsDetail.trim() || null,
         completion: (fCompletion || null) as Case['completion'],
+        incomplete_reason: fCompletion === 'incomplete' ? fIncompleteReason.trim() : null,
         satisfaction_score: fSatisfaction,
         receiver_name: fReceiverName.trim() || null,
         receiver_doc: fReceiverDoc.trim() || null,
@@ -367,6 +373,7 @@
       typeLabel: TYPE_LABEL[c.type],
       priorityLabel: PRIORITY_META[c.priority].label,
       completionLabel: c.completion ? COMPLETION_LABEL[c.completion] : '—',
+      incompleteReason: c.completion === 'incomplete' ? (c.incomplete_reason ?? '—') : null,
       satisfactionQuestion: SATISFACTION_QUESTION,
       satisfactionLabel: satisfactionFull(c.satisfaction_score),
       satisfactionScore: c.satisfaction_score ?? null,
@@ -566,6 +573,18 @@
             <Input label="Nº de repuestos" type="number" bind:value={fPartsCount} placeholder="0" />
             <Select label="Estado final *" bind:value={fCompletion} options={COMPLETION_OPTIONS} placeholder="— Selecciona —" error={errors.fCompletion} />
           </div>
+          {#if fCompletion === 'incomplete'}
+            <div class="mt-3">
+              <Textarea
+                label="¿Por qué quedó incompleto? *"
+                bind:value={fIncompleteReason}
+                rows={2}
+                placeholder="Ej. repuesto no disponible, equipo en uso, falta autorización…"
+                required
+                error={errors.fIncompleteReason}
+              />
+            </div>
+          {/if}
           <div class="mt-3">
             <Textarea label="Detalle de repuestos" bind:value={fPartsDetail} rows={2} placeholder="Lista de repuestos usados…" />
           </div>

@@ -9,6 +9,8 @@ export interface Profile {
   full_name: string;
   role: UserRole;
   active: boolean;
+  /** La cuenta nació con la contraseña por defecto y aún no la ha cambiado. */
+  must_change_password?: boolean;
   avatar_url?: string | null;
   clinic_id?: string | null;
   clinic_name?: string | null;

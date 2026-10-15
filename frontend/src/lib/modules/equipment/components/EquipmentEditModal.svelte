@@ -8,8 +8,10 @@
   import DatePicker from '$lib/components/DatePicker.svelte';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
+  import { clinicsApi } from '$lib/modules/clinics/api';
   import type { Equipment, EquipmentUpdate } from '$lib/modules/equipment/types';
   import type { Sector } from '$lib/modules/sectors/types';
+  import type { Location } from '$lib/modules/clinics/types';
   import { toasts } from '$lib/stores/toasts';
 
   export let open = false;
@@ -18,6 +20,7 @@
   const dispatch = createEventDispatcher<{ saved: Equipment }>();
 
   let sectors: Sector[] = [];
+  let locations: Location[] = [];
   let form = {
     name: '',
     brand: '',
@@ -27,6 +30,7 @@
     status: 'operational' as Equipment['status'],
     risk_class: '',
     sector_id: '',
+    location_id: '',
     notes: '',
     acquisition_date: '',
     warranty_until: '',
@@ -43,6 +47,7 @@
       status: equipment.status,
       risk_class: equipment.risk_class ?? '',
       sector_id: equipment.sector_id ?? '',
+      location_id: equipment.location_id ?? '',
       notes: equipment.notes ?? '',
       acquisition_date: equipment.acquisition_date ?? '',
       warranty_until: equipment.warranty_until ?? '',
@@ -60,12 +65,18 @@
     prevOpen = false;
   }
 
-  // Cargar las unidades de servicio de la clínica del equipo al abrir.
+  // Cargar las unidades de servicio y las ubicaciones físicas de la clínica del
+  // equipo al abrir. La ubicación solo se podía elegir al crear el equipo: sin
+  // esto, un equipo que se mueve de sala se queda con la de siempre.
   $: if (open && equipment.clinic_id && sectors.length === 0) {
     sectorsApi
       .list(equipment.clinic_id)
       .then((s) => (sectors = s))
       .catch(() => (sectors = []));
+    clinicsApi
+      .locations(equipment.clinic_id)
+      .then((l) => (locations = l))
+      .catch(() => (locations = []));
   }
 
   async function save() {
@@ -80,6 +91,7 @@
         status: form.status,
         risk_class: (form.risk_class || undefined) as 'I' | 'IIa' | 'IIb' | 'III' | undefined,
         sector_id: form.sector_id || undefined,
+        location_id: form.location_id || undefined,
         notes: form.notes || undefined,
         acquisition_date: form.acquisition_date || undefined,
         warranty_until: form.warranty_until || undefined,
@@ -127,6 +139,12 @@
       label="Unidad de servicio"
       bind:value={form.sector_id}
       options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+    />
+    <Select
+      label="Ubicación"
+      bind:value={form.location_id}
+      options={locations.map((l) => ({ value: l.id, label: l.name }))}
+      placeholder="— Sin ubicación —"
     />
     <DatePicker label="Adquirido" bind:value={form.acquisition_date} />
     <DatePicker label="Garantía hasta" bind:value={form.warranty_until} />

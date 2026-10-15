@@ -40,6 +40,11 @@ class User(Base, UUIDPrimaryKey, Timestamps):
     # Hoja de vida (CV): ruta en Supabase Storage del archivo único del usuario.
     cv_path: Mapped[str | None] = mapped_column(String(1024))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    # La cuenta nació con la contraseña por defecto: la app no la deja entrar a
+    # ninguna pantalla hasta que la cambie.
+    must_change_password: Mapped[bool] = mapped_column(
+        Boolean, default=False, nullable=False, server_default="false"
+    )
     last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     clinic_id: Mapped[uuid.UUID | None] = mapped_column(

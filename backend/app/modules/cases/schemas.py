@@ -40,6 +40,8 @@ class CaseResolution(BaseModel):
     parts_count: int | None = Field(default=None, ge=0)
     parts_detail: str | None = None
     completion: CaseCompletion | None = None
+    # Por qué el servicio quedó incompleto. Solo aplica a `completion=incomplete`.
+    incomplete_reason: str | None = Field(default=None, max_length=4000)
     # Satisfacción del servicio en escala Likert de 7 puntos.
     satisfaction_score: int | None = Field(
         default=None, ge=SATISFACTION_MIN, le=SATISFACTION_MAX
@@ -72,6 +74,23 @@ class CaseUpdate(CaseResolution):
     sector_id: uuid.UUID | None = None
     assigned_to: uuid.UUID | None = None
     sla_due_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def _check_incomplete_reason(self) -> CaseUpdate:
+        """Un cierre incompleto sin motivo deja el soporte firmado sin explicar.
+
+        Va aquí y no en `CaseResolution` porque `CaseOut` también la hereda: los
+        casos ya cerrados antes de esta regla no traen motivo y no deben romper
+        la lectura.
+        """
+        if self.completion == CaseCompletion.INCOMPLETE and not (
+            self.incomplete_reason or ""
+        ).strip():
+            raise ValueError("Indica por qué el servicio quedó incompleto")
+        # El `check` de la BD no admite motivo sin estado incompleto.
+        if self.completion is not None and self.completion != CaseCompletion.INCOMPLETE:
+            self.incomplete_reason = None
+        return self
 
 
 class CaseOut(CaseBase, CaseResolution):

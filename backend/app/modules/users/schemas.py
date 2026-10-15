@@ -6,6 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
+from app.core.config import settings
 from app.db.enums import UserRole
 
 
@@ -27,7 +28,18 @@ class UserCreate(UserBase):
 class UserInvite(UserBase):
     """Alta completa desde la UI: crea la cuenta en Supabase Auth + el perfil."""
 
-    password: str = Field(min_length=8, max_length=128)
+    # 6 es el mínimo que acepta Supabase Auth (GoTrue); por debajo rechaza el
+    # alta. La contraseña por defecto es provisional: `must_change_password`
+    # obliga a reemplazarla en el primer acceso.
+    password: str = Field(
+        default=settings.DEFAULT_USER_PASSWORD, min_length=6, max_length=128
+    )
+
+
+class PasswordChange(BaseModel):
+    """Cambio de contraseña del propio usuario."""
+
+    new_password: str = Field(min_length=6, max_length=128)
 
 
 class UserUpdate(BaseModel):
@@ -47,6 +59,8 @@ class UserOut(UserBase):
     avatar_url: str | None = None
     cv_path: str | None = None
     active: bool
+    # La cuenta nació con la contraseña por defecto y aún no la ha cambiado.
+    must_change_password: bool = False
     clinic_name: str | None = None
     last_seen_at: datetime | None = None
     created_at: datetime

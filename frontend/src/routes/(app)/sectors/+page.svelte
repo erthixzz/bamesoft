@@ -21,14 +21,25 @@
   import { toasts } from '$lib/stores/toasts';
   import { profile, role } from '$lib/stores/auth';
   import { can } from '$lib/utils/permissions';
-  import { Building2, PlusCircle, Boxes, Cpu } from 'lucide-svelte';
+  import { Building2, PlusCircle, Boxes, Cpu, PencilLine } from 'lucide-svelte';
 
   let sectors: Sector[] = [];
   let equipment: Equipment[] = [];
   let clinics: Clinic[] = [];
   let loading = true;
 
-  $: canManage = can.manageEquipment($role);
+  // Compañía activa: la elige el super admin en el header. Para el resto de
+  // roles el backend fuerza la suya, así que enviarla no cambia nada.
+  $: activeClinic = $profile?.clinic_id ?? null;
+  let loadedFor: string | null | undefined;
+  $: if ($profile && loadedFor !== activeClinic) {
+    loadedFor = activeClinic;
+    load();
+  }
+
+  // La capacidad que exige el backend para crear/editar unidades es `sectors`,
+  // no `equipment`: el gate de la UI tiene que mirar la misma.
+  $: canManage = can.manageSectors($role);
   $: bySector = (() => {
     const map: Record<string, Equipment[]> = {};
     for (const e of equipment) {
@@ -41,9 +52,11 @@
 
   const ACCENTS = ['brand', 'cyan', 'emerald', 'amber', 'violet', 'rose'] as const;
 
-  // ---- Modal: nueva unidad de servicio ----
+  // ---- Modal: crear / editar unidad de servicio ----
   let newOpen = false;
   let saving = false;
+  /** Unidad que se está editando; `null` = alta nueva. */
+  let editing: Sector | null = null;
   let form = { code: '', name: '', description: '' };
   let formErr: Record<string, string> = {};
 
@@ -51,8 +64,8 @@
     loading = true;
     try {
       [sectors, equipment, clinics] = await Promise.all([
-        sectorsApi.list(),
-        equipmentApi.list({ limit: 500 }),
+        sectorsApi.list(activeClinic ?? undefined),
+        equipmentApi.list({ limit: 500, clinic_id: activeClinic ?? undefined }),
         clinicsApi.list().catch(() => []),
       ]);
     } catch (e) {
@@ -64,38 +77,59 @@
 
   onMount(() => {
     setPageTitle('Unidades de servicio');
-    load();
+    // La carga la dispara el bloque reactivo de la compañía activa.
   });
 
   function openNew() {
+    editing = null;
     form = { code: '', name: '', description: '' };
+    formErr = {};
+    newOpen = true;
+  }
+
+  function openEdit(s: Sector) {
+    editing = s;
+    form = { code: s.code, name: s.name, description: s.description ?? '' };
     formErr = {};
     newOpen = true;
   }
 
   async function saveSector() {
     const err: Record<string, string> = {};
-    if (!form.code.trim()) err.code = 'Código requerido';
+    if (!editing && !form.code.trim()) err.code = 'Código requerido';
     if (!form.name.trim()) err.name = 'Nombre requerido';
+    // La clínica solo hace falta al crear: al editar la unidad ya tiene la suya.
     const clinic_id = get(profile)?.clinic_id ?? clinics[0]?.id;
-    if (!clinic_id) err.name = 'No hay una clínica disponible';
+    if (!editing && !clinic_id) err.name = 'No hay una clínica disponible';
     formErr = err;
     if (Object.keys(err).length) return;
 
     saving = true;
     try {
-      await sectorsApi.create({
-        clinic_id: clinic_id!,
-        code: form.code.trim().toUpperCase(),
-        name: form.name.trim(),
-        description: form.description.trim() || null,
-        default_engineer_id: null,
-      });
-      toasts.success(`Unidad ${form.name} creada`);
+      if (editing) {
+        // El código identifica la unidad dentro de la clínica y el backend no
+        // lo admite en `SectorUpdate`: solo nombre y descripción.
+        await sectorsApi.update(editing.id, {
+          name: form.name.trim(),
+          description: form.description.trim() || null,
+        });
+        toasts.success(`Unidad ${form.name} actualizada`);
+      } else {
+        await sectorsApi.create({
+          clinic_id: clinic_id!,
+          code: form.code.trim().toUpperCase(),
+          name: form.name.trim(),
+          description: form.description.trim() || null,
+          default_engineer_id: null,
+        });
+        toasts.success(`Unidad ${form.name} creada`);
+      }
       newOpen = false;
       await load();
     } catch (e) {
-      toasts.error(e instanceof Error ? e.message : 'No se pudo crear la unidad');
+      toasts.error(
+        e instanceof Error ? e.message : `No se pudo ${editing ? 'actualizar' : 'crear'} la unidad`,
+      );
     } finally {
       saving = false;
     }
@@ -138,6 +172,17 @@
           <span class="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600">
             <Cpu class="h-3.5 w-3.5" /> {items.length}
           </span>
+          {#if canManage}
+            <button
+              type="button"
+              class="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-brand-600"
+              on:click={() => openEdit(s)}
+              aria-label={`Editar ${s.name}`}
+              title="Editar unidad"
+            >
+              <PencilLine class="h-4 w-4" />
+            </button>
+          {/if}
         </svelte:fragment>
 
         {#if items.length}
@@ -193,9 +238,17 @@
   {/if}
 {/if}
 
-<Modal bind:open={newOpen} title="Nueva unidad de servicio">
+<Modal bind:open={newOpen} title={editing ? `Editar ${editing.name}` : 'Nueva unidad de servicio'}>
   <div class="grid gap-3 sm:grid-cols-2">
-    <Input label="Código *" bind:value={form.code} placeholder="UCI" error={formErr.code} />
+    {#if editing}
+      <!-- El código identifica la unidad dentro de la clínica: no se cambia. -->
+      <div>
+        <span class="mb-1 block text-sm font-medium text-slate-700">Código</span>
+        <p class="input flex items-center bg-slate-50 font-mono text-slate-500">{editing.code}</p>
+      </div>
+    {:else}
+      <Input label="Código *" bind:value={form.code} placeholder="UCI" error={formErr.code} />
+    {/if}
     <Input label="Nombre *" bind:value={form.name} placeholder="Unidad de Cuidados Intensivos" error={formErr.name} />
     <div class="sm:col-span-2">
       <Textarea label="Descripción" bind:value={form.description} rows={2} placeholder="Breve descripción del área…" />
@@ -204,7 +257,9 @@
   <svelte:fragment slot="footer">
     <div class="flex justify-end gap-2">
       <button class="btn-secondary" on:click={() => (newOpen = false)}>Cancelar</button>
-      <Button on:click={saveSector} loading={saving}>Crear unidad</Button>
+      <Button on:click={saveSector} loading={saving}>
+        {editing ? 'Guardar cambios' : 'Crear unidad'}
+      </Button>
     </div>
   </svelte:fragment>
 </Modal>

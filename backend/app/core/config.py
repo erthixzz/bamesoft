@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
+    # Contraseña con la que nace una cuenta cuando quien la da de alta no indica
+    # otra. Es provisional: `users.must_change_password` obliga a cambiarla en el
+    # primer acceso. Supabase Auth no acepta menos de 6 caracteres, y el mínimo
+    # del proyecto (Authentication → Password) debe estar en 6 o el alta falla.
+    DEFAULT_USER_PASSWORD: str = "123456"
+
     # CORS
     CORS_ORIGINS: str = "http://localhost:5173"
     # Regex opcional para previews (p. ej. r"https://bamesoft-[a-z0-9-]+\.vercel\.app").

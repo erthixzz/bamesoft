@@ -382,6 +382,7 @@ const FIELD_LABEL: Record<string, string> = {
   priority: 'Prioridad',
   type: 'Tipo',
   completion: 'Estado final',
+  incomplete_reason: 'Motivo de lo incompleto',
   satisfaction_score: 'Satisfacción',
   tecnovigilancia: 'Tecnovigilancia',
   tecnovigilancia_stage: 'Etapa de tecnovigilancia',

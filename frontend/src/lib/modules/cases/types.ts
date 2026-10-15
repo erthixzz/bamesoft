@@ -14,6 +14,8 @@ export interface CaseResolution {
   parts_count?: number | null;
   parts_detail?: string | null;
   completion?: CaseCompletion | null;
+  /** Por qué el servicio quedó incompleto. Solo aplica a `completion='incomplete'`. */
+  incomplete_reason?: string | null;
   /** Satisfacción del servicio en escala Likert de 7 puntos. */
   satisfaction_score?: SatisfactionScore | null;
   receiver_name?: string | null;

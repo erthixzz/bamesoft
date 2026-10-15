@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import BadRequest, NotFound
-from app.db.enums import CaseStatus
+from app.db.enums import CaseCompletion, CaseStatus
 from app.modules.cases.models import Case, CaseActivity
 from app.modules.cases.schemas import (
     CaseActivityIn,
@@ -151,6 +151,9 @@ async def update_case(
         obj.closed_at = None
         obj.finished_at = None
         obj.completion = None
+        # El motivo acompaña al estado final: sin estado no puede sobrevivir
+        # (además el `check` de 0016 lo prohíbe).
+        obj.incomplete_reason = None
         obj.satisfaction_score = None
     if new_status == CaseStatus.IN_PROGRESS and obj.work_started_at is None:
         obj.work_started_at = now
@@ -158,6 +161,11 @@ async def update_case(
         obj.status = CaseStatus.ASSIGNED
         if obj.assigned_at is None:
             obj.assigned_at = now
+
+    # Pasar de «incompleto» a «completo» sin mandar el motivo dejaría el motivo
+    # viejo colgando y el `check` de 0016 rechazaría el UPDATE entero.
+    if "completion" in data and data["completion"] != CaseCompletion.INCOMPLETE:
+        data["incomplete_reason"] = None
 
     for k, v in data.items():
         setattr(obj, k, v)

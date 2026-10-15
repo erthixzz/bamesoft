@@ -11,6 +11,8 @@
     typeLabel: string;
     priorityLabel: string;
     completionLabel: string;
+    /** Motivo del cierre incompleto, o `null` si el servicio quedó completo. */
+    incompleteReason: string | null;
     /** Pregunta de satisfacción, tal cual se le hizo a quien recibe. */
     satisfactionQuestion: string;
     /** «5 — Algo satisfecho» (Likert de 7 puntos) o '—' si no calificó. */
@@ -126,6 +128,8 @@
         ['Nº de repuestos', report.partsCount],
       ], wide: [
         ['¿Qué actividad se hizo?', report.workPerformed],
+        // El motivo solo se imprime cuando el servicio quedó incompleto.
+        ...(report.incompleteReason ? [['¿Por qué quedó incompleto?', report.incompleteReason]] : []),
         ['Detalle de repuestos', report.partsDetail],
       ] },
     ] as section}

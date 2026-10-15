@@ -10,6 +10,8 @@ export interface User {
   avatar_url?: string | null;
   cv_path?: string | null;
   active: boolean;
+  /** La cuenta nació con la contraseña por defecto y aún no la ha cambiado. */
+  must_change_password?: boolean;
   clinic_id?: string | null;
   clinic_name?: string | null;
   last_seen_at?: string | null;

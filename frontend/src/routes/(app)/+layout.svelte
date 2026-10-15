@@ -70,6 +70,13 @@
     if (!$page.url.pathname.startsWith(dest)) goto(dest);
   }
 
+  // Contraseña provisional sin cambiar: fuera de la aplicación hasta elegir una
+  // propia. Es reactivo (y no solo en `onMount`) para que también atrape la
+  // navegación interna cuando el perfil ya estaba en memoria.
+  $: if (!booting && !bootError && $profile?.must_change_password) {
+    goto('/cambiar-password');
+  }
+
   onMount(async () => {
     if (!get(isAuthenticated)) {
       goto('/login');

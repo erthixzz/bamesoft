@@ -10,6 +10,7 @@
   import type { Clinic } from '$lib/modules/clinics/types';
   import type { UserRole } from '$lib/api/types';
   import { ROLE_LABELS, ALL_ROLES } from '$lib/utils/permissions';
+  import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '$lib/modules/users/constants';
   import { toasts } from '$lib/stores/toasts';
   import { role } from '$lib/stores/auth';
 
@@ -21,10 +22,12 @@
   let saving = false;
   let errors: Record<string, string> = {};
 
+  // La contraseña viene prellenada con la provisional: quien da de alta solo la
+  // dicta, y el usuario está obligado a cambiarla al entrar por primera vez.
   let form = {
     full_name: '',
     email: '',
-    password: '',
+    password: DEFAULT_PASSWORD,
     role: 'client' as UserRole,
     clinic_id: '',
     phone: '',
@@ -47,7 +50,7 @@
   }
 
   function reset() {
-    form = { full_name: '', email: '', password: '', role: 'client', clinic_id: '', phone: '', license_number: '' };
+    form = { full_name: '', email: '', password: DEFAULT_PASSWORD, role: 'client', clinic_id: '', phone: '', license_number: '' };
     errors = {};
   }
 
@@ -57,7 +60,8 @@
     const e: Record<string, string> = {};
     if (form.full_name.trim().length < 2) e.full_name = 'Nombre requerido';
     if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) e.email = 'Email inválido';
-    if (form.password.length < 8) e.password = 'Mínimo 8 caracteres';
+    if (form.password.length < MIN_PASSWORD_LENGTH)
+      e.password = `Mínimo ${MIN_PASSWORD_LENGTH} caracteres`;
     errors = e;
     if (Object.keys(e).length) return;
 
@@ -89,7 +93,7 @@
       <Input label="Nombre completo *" bind:value={form.full_name} error={errors.full_name} placeholder="Nombre y apellidos" />
     </div>
     <Input label="Email *" type="email" bind:value={form.email} error={errors.email} placeholder="usuario@clinica.com" />
-    <Input label="Contraseña *" type="password" bind:value={form.password} error={errors.password} placeholder="Mínimo 8 caracteres" />
+    <Input label="Contraseña provisional *" bind:value={form.password} error={errors.password} placeholder={`Mínimo ${MIN_PASSWORD_LENGTH} caracteres`} />
     <Select label="Rol" bind:value={form.role} options={roleOptions} />
     {#if isSuper}
       <Select
@@ -103,7 +107,13 @@
     <Input label="Licencia / matrícula" bind:value={form.license_number} />
   </div>
   <p class="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-    El usuario podrá entrar de inmediato con su email y contraseña. Pídele que la cambie en su primer acceso.
+    {#if form.password === DEFAULT_PASSWORD}
+      Entra con su email y la contraseña <strong class="font-semibold text-slate-700">{DEFAULT_PASSWORD}</strong>.
+      La aplicación le pedirá cambiarla en su primer acceso, antes de dejarle hacer nada más.
+    {:else}
+      Elegiste una contraseña propia: el usuario entrará con ella y no se le pedirá cambiarla.
+      Déjala en <strong class="font-semibold text-slate-700">{DEFAULT_PASSWORD}</strong> si prefieres que la cambie él.
+    {/if}
   </p>
   <svelte:fragment slot="footer">
     <div class="flex justify-end gap-2">

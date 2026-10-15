@@ -14,6 +14,7 @@
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
   import { usersApi } from '$lib/modules/users/api';
+  import { profile } from '$lib/stores/auth';
   import type { Equipment } from '$lib/modules/equipment/types';
   import type { Sector } from '$lib/modules/sectors/types';
   import type { User } from '$lib/modules/users/types';
@@ -64,9 +65,13 @@
   onMount(async () => {
     setPageTitle('Nuevo caso');
     try {
+      // Acotado a la compañía activa: abrir un caso sobre el equipo de otra
+      // compañía nunca es lo que se quiere (al resto de roles el backend ya se
+      // lo fuerza).
+      const activeClinic = get(profile)?.clinic_id ?? undefined;
       const [eq, sec, all] = await Promise.all([
-        equipmentApi.list({ limit: 200 }),
-        sectorsApi.list(),
+        equipmentApi.list({ limit: 200, clinic_id: activeClinic }),
+        sectorsApi.list(activeClinic),
         usersApi.list().catch(() => [] as User[]),
       ]);
       equipment = eq;

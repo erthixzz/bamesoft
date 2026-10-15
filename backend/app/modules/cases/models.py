@@ -77,6 +77,9 @@ class Case(Base, UUIDPrimaryKey, Timestamps):
     completion: Mapped[CaseCompletion | None] = mapped_column(
         pg_enum(CaseCompletion, "case_completion")
     )
+    # Por qué el servicio quedó incompleto. El `check` de 0016 solo la admite
+    # cuando `completion = 'incomplete'`.
+    incomplete_reason: Mapped[str | None] = mapped_column(Text)
     # Satisfacción en escala Likert de 7 puntos (1 = Muy insatisfecho … 7 = Muy
     # satisfecho). La columna `satisfaction` (3 caritas) quedó obsoleta en 0015.
     satisfaction_score: Mapped[int | None] = mapped_column(SmallInteger)

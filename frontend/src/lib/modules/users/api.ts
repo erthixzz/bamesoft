@@ -6,6 +6,9 @@ export const usersApi = {
   list: (q?: string) => api.get<User[]>('/users', q ? { q } : undefined),
   get: (id: string) => api.get<User>(`/users/${id}`),
   me: () => api.get<User>('/users/me'),
+  /** Cambia la contraseña del usuario autenticado (y baja la bandera de cambio). */
+  changePassword: (newPassword: string) =>
+    api.post<User>('/users/me/password', { new_password: newPassword }),
   create: (payload: UserCreate) => api.post<User>('/users', payload),
   invite: (payload: UserInvite) => api.post<User>('/users/invite', payload),
   update: (id: string, payload: UserUpdate) => api.patch<User>(`/users/${id}`, payload),

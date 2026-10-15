@@ -16,6 +16,7 @@
   import { formatDate } from '$lib/utils/format';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
+  import { profile } from '$lib/stores/auth';
   import { QrCode, Search, PlusCircle, Eye, Pencil, Copy, RefreshCw, Layers } from 'lucide-svelte';
 
   let rows: Equipment[] = [];
@@ -24,6 +25,16 @@
   let sectorFilter = '';
   let groupByUnit = false;
   let loading = false;
+
+  // Compañía activa. Para el super admin la elige en el selector del header (y
+  // vive en su perfil); para el resto de roles el backend la fuerza de todos
+  // modos, así que enviarla es inocuo.
+  $: activeClinic = $profile?.clinic_id ?? null;
+  let loadedFor: string | null | undefined;
+  $: if ($profile && loadedFor !== activeClinic) {
+    loadedFor = activeClinic;
+    loadForClinic();
+  }
 
   $: sectorName = Object.fromEntries(sectors.map((s) => [s.id, s.name]));
   $: sectorOptions = [
@@ -57,12 +68,24 @@
   async function load() {
     loading = true;
     try {
-      rows = await equipmentApi.list({ q, sector_id: sectorFilter || undefined });
+      rows = await equipmentApi.list({
+        q,
+        sector_id: sectorFilter || undefined,
+        clinic_id: activeClinic ?? undefined,
+      });
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'Error cargando equipos');
     } finally {
       loading = false;
     }
+  }
+
+  /** Recarga todo lo que depende de la compañía (equipos y sus unidades). */
+  async function loadForClinic() {
+    sectors = await sectorsApi.list(activeClinic ?? undefined).catch(() => []);
+    // La unidad elegida pertenece a la compañía anterior: deja de tener sentido.
+    if (sectorFilter && !sectors.some((s) => s.id === sectorFilter)) sectorFilter = '';
+    await load();
   }
 
   async function copy(text: string, label = 'Copiado') {
@@ -91,10 +114,10 @@
     { label: 'Regenerar QR', icon: RefreshCw, onClick: () => regenerateQr(row) },
   ];
 
-  onMount(async () => {
+  onMount(() => {
     setPageTitle('Equipos');
-    sectors = await sectorsApi.list().catch(() => []);
-    await load();
+    // La carga la dispara el bloque reactivo de la compañía activa, que además
+    // cubre el cambio de compañía sin salir de la página.
   });
 </script>
 

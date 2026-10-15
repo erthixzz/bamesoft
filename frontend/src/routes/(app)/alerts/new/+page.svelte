@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { goto } from '$app/navigation';
+  import { get } from 'svelte/store';
   import Card from '$lib/components/Card.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -13,6 +14,7 @@
   import type { AlertType, AlertSeverity } from '$lib/api/types';
   import { setPageTitle } from '$lib/stores/page';
   import { toasts } from '$lib/stores/toasts';
+  import { profile } from '$lib/stores/auth';
 
   let equipment: Equipment[] = [];
   let loading = false;
@@ -27,7 +29,12 @@
 
   onMount(async () => {
     setPageTitle('Nueva alerta');
-    equipment = await equipmentApi.list({ limit: 200 });
+    // Solo equipos de la compañía activa: una alerta sobre el equipo de otra
+    // compañía no le llegaría a quien debe atenderla.
+    equipment = await equipmentApi.list({
+      limit: 200,
+      clinic_id: get(profile)?.clinic_id ?? undefined,
+    });
   });
 
   async function onSubmit(e: SubmitEvent) {

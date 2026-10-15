@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.core.errors import BadRequest, Conflict, Forbidden, NotFound
 from app.db.enums import UserRole
 from app.integrations import supabase as sb
@@ -149,6 +150,9 @@ async def invite_user(
             phone=payload.phone,
             license_number=payload.license_number,
             clinic_id=scope if scope is not None else payload.clinic_id,
+            # Quien no eligió su contraseña (se quedó con la por defecto) tiene
+            # que cambiarla antes de poder usar la aplicación.
+            must_change_password=payload.password == settings.DEFAULT_USER_PASSWORD,
         )
         db.add(user)
         await db.flush()
@@ -178,6 +182,35 @@ async def update_user(
         data.pop("clinic_id", None)  # no puede mover usuarios a otra clínica
     for k, v in data.items():
         setattr(user, k, v)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def change_own_password(db: AsyncSession, user: User, new_password: str) -> User:
+    """Cambia la contraseña del propio usuario y levanta la bandera de cambio.
+
+    Se hace con la service key contra GoTrue (no con el token del usuario) para
+    que el flujo funcione igual tanto en el cambio obligatorio del primer acceso
+    como en un cambio voluntario posterior.
+    """
+    if new_password == settings.DEFAULT_USER_PASSWORD:
+        raise BadRequest("Elige una contraseña distinta de la provisional.")
+
+    try:
+        admin = supabase_admin()
+    except RuntimeError as exc:
+        raise BadRequest(
+            "El servidor no tiene configurado Supabase (URL / SERVICE_KEY); "
+            "no se puede cambiar la contraseña."
+        ) from exc
+
+    try:
+        admin.auth.admin.update_user_by_id(str(user.id), {"password": new_password})
+    except Exception as exc:  # p. ej. no cumple la política del proyecto
+        raise BadRequest(f"No se pudo cambiar la contraseña: {exc}") from exc
+
+    user.must_change_password = False
     await db.flush()
     await db.refresh(user)
     return user
