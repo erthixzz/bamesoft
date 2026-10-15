@@ -1,7 +1,7 @@
 <script lang="ts">
   /** Pad de firma · estilo Bamesoft.
-   *  Canvas táctil/mouse responsive. Expone `clear()`, `isEmpty()` y
-   *  `toDataURL()` (PNG) vía `bind:this`. Soporta alta densidad (DPR). */
+   *  Canvas táctil/mouse responsive. Expone `clear()`, `isEmpty()`,
+   *  `toDataURL()` y `toBlob()` (PNG) vía `bind:this`. Soporta alta densidad (DPR). */
   import { onMount, createEventDispatcher } from 'svelte';
   import { Eraser } from 'lucide-svelte';
 
@@ -76,18 +76,42 @@
     return !dirty;
   }
 
-  /** PNG con fondo blanco (para que se vea bien en el PDF/impresión). */
-  export function toDataURL(): string | null {
+  // Ancho máximo del PNG exportado. En un móvil con DPR 3 el lienzo real supera
+  // los 3000 px: más resolución de la que necesita una firma y un archivo
+  // innecesariamente pesado de subir.
+  const MAX_EXPORT_WIDTH = 1200;
+
+  /** Copia del trazo sobre fondo blanco (para que se vea bien en PDF/impresión). */
+  function composite(): HTMLCanvasElement | null {
     if (!ctx || !dirty) return null;
+    const scale = Math.min(1, MAX_EXPORT_WIDTH / canvas.width);
     const out = document.createElement('canvas');
-    out.width = canvas.width;
-    out.height = canvas.height;
+    out.width = Math.max(1, Math.round(canvas.width * scale));
+    out.height = Math.max(1, Math.round(canvas.height * scale));
     const octx = out.getContext('2d');
     if (!octx) return null;
     octx.fillStyle = '#ffffff';
     octx.fillRect(0, 0, out.width, out.height);
-    octx.drawImage(canvas, 0, 0);
-    return out.toDataURL('image/png');
+    octx.drawImage(canvas, 0, 0, out.width, out.height);
+    return out;
+  }
+
+  /** PNG como data URL (para incrustar en la vista imprimible). */
+  export function toDataURL(): string | null {
+    return composite()?.toDataURL('image/png') ?? null;
+  }
+
+  /**
+   * PNG como `Blob`, listo para subir.
+   *
+   * Se usa `canvas.toBlob()` en vez de `fetch(toDataURL())`: la CSP de la app
+   * acota `connect-src` a la API y a Supabase, así que pedir un `data:` URL con
+   * `fetch` lo bloquea el navegador y falla con un opaco "Failed to fetch".
+   */
+  export function toBlob(): Promise<Blob | null> {
+    const out = composite();
+    if (!out) return Promise.resolve(null);
+    return new Promise((resolve) => out.toBlob((b) => resolve(b), 'image/png'));
   }
 
   onMount(() => {

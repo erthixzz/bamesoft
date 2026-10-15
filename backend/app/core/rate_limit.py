@@ -81,6 +81,12 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         if request.url.path.startswith(_EXEMPT_PATHS):
             return await call_next(request)
 
+        # El preflight CORS no toca la base de datos y el navegador lo emite por
+        # su cuenta: contarlo gastaría el cupo del usuario al doble y un 429 en
+        # el OPTIONS el navegador lo reporta como un opaco "Failed to fetch".
+        if request.method == "OPTIONS":
+            return await call_next(request)
+
         now = time.monotonic()
         self._prune(now)
         key = self._client_key(request)

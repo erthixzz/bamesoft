@@ -261,9 +261,11 @@
   /** Sube la firma del pad (si hay trazo) y devuelve su storage_path. */
   async function uploadSignatureIfDrawn(): Promise<string | null> {
     if (!sigPad || sigPad.isEmpty() || !c) return c?.signature_path ?? null;
-    const dataUrl = sigPad.toDataURL();
-    if (!dataUrl) return c.signature_path ?? null;
-    const blob = await (await fetch(dataUrl)).blob();
+    // `toBlob()` en vez de `fetch(toDataURL())`: la CSP acota `connect-src` a la
+    // API y a Supabase, así que pedir un `data:` URL con fetch lo bloquea el
+    // navegador y falla con un opaco "Failed to fetch".
+    const blob = await sigPad.toBlob();
+    if (!blob) return c.signature_path ?? null;
     const file = new File([blob], `firma-${c.code}.png`, { type: 'image/png' });
     const doc = await documentsApi.upload(file, {
       title: `Firma ${c.code}`,

@@ -64,7 +64,17 @@ export async function request<T = unknown>(path: string, opts: RequestOpts = {})
   } catch {
     // Render cold start / red: primer intento a veces falla sin respuesta CORS
     await new Promise((r) => setTimeout(r, 2000));
-    res = await fetch(url, init);
+    try {
+      res = await fetch(url, init);
+    } catch {
+      // `fetch` solo lanza cuando la petición ni siquiera llegó a tener
+      // respuesta (sin red, servidor caído, CORS o CSP). El mensaje nativo es
+      // un opaco "Failed to fetch": lo cambiamos por algo accionable.
+      throw new ApiError(
+        0,
+        'No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.',
+      );
+    }
   }
 
   if (!res.ok) {
