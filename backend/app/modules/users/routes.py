@@ -19,6 +19,7 @@ from app.modules.users import service
 from app.modules.users.models import User
 from app.modules.users.schemas import (
     PasswordChange,
+    PasswordReset,
     UserCreate,
     UserInvite,
     UserOut,
@@ -112,6 +113,27 @@ async def update_user(
     return await service.update_user(db, user_id, payload, clinic_scope(current))
 
 
+@router.post(
+    "/{user_id}/password",
+    response_model=UserOut,
+    dependencies=[Depends(requires("users"))],
+)
+async def reset_user_password(
+    user_id: uuid.UUID,
+    payload: PasswordReset,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_clinic_admin),
+) -> User:
+    """Un administrador asigna una contraseña nueva a otro usuario.
+
+    Es la salida cuando alguien ya no puede entrar: no hay forma de recuperar
+    una contraseña, solo de reemplazarla.
+    """
+    return await service.set_user_password(
+        db, user_id, payload.new_password, clinic_scope(current)
+    )
+
+
 @router.delete(
     "/{user_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -123,6 +145,27 @@ async def deactivate_user(
     current: User = Depends(require_clinic_admin),
 ) -> None:
     await service.deactivate_user(db, user_id, clinic_scope(current))
+
+
+@router.delete(
+    "/{user_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(requires("users"))],
+)
+async def delete_user_permanently(
+    user_id: uuid.UUID,
+    db: AsyncSession = Depends(get_session),
+    current: User = Depends(require_clinic_admin),
+) -> None:
+    """Borrado real (perfil + cuenta de acceso + CV).
+
+    Separado del DELETE normal, que desactiva: son operaciones distintas y no
+    debe poder confundirse una con otra. Solo procede si el usuario no dejó
+    historial; si lo dejó, el servicio responde 409 explicando por qué.
+    """
+    await service.delete_user_permanently(
+        db, user_id, actor_id=current.id, scope=clinic_scope(current)
+    )
 
 
 @router.post(

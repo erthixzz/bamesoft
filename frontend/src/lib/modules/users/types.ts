@@ -29,7 +29,8 @@ export interface UserCreate {
   clinic_id?: string | null;
 }
 
-export type UserUpdate = Partial<Omit<UserCreate, 'id' | 'email'>> & { active?: boolean };
+/** `email` incluido: al cambiarlo, el backend mueve también la credencial en Supabase Auth. */
+export type UserUpdate = Partial<Omit<UserCreate, 'id'>> & { active?: boolean };
 
 /** Alta completa desde la UI (crea cuenta de acceso + perfil). */
 export interface UserInvite {

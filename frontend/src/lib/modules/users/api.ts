@@ -12,7 +12,12 @@ export const usersApi = {
   create: (payload: UserCreate) => api.post<User>('/users', payload),
   invite: (payload: UserInvite) => api.post<User>('/users/invite', payload),
   update: (id: string, payload: UserUpdate) => api.patch<User>(`/users/${id}`, payload),
+  /** Un administrador asigna una contraseña nueva a otro usuario. */
+  resetPassword: (id: string, newPassword: string) =>
+    api.post<User>(`/users/${id}/password`, { new_password: newPassword }),
   deactivate: (id: string) => api.delete<void>(`/users/${id}`),
+  /** Borrado real (perfil + cuenta + CV). Falla con 409 si el usuario tiene historial. */
+  remove: (id: string) => api.delete<void>(`/users/${id}/permanent`),
   /** Sube (o reemplaza) la hoja de vida (CV) del usuario. */
   uploadCv: (id: string, file: File) => {
     const fd = new FormData();

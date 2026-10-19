@@ -6,7 +6,7 @@ import uuid
 from collections.abc import Sequence
 from datetime import UTC, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -70,6 +70,17 @@ async def create_user(
     await db.flush()
     await db.refresh(user)
     return user
+
+
+def _auth_admin():
+    """Cliente admin de Supabase Auth, o un error legible si falta configuración."""
+    try:
+        return supabase_admin()
+    except RuntimeError as exc:  # falta URL / SERVICE_KEY en el entorno
+        raise BadRequest(
+            "El servidor no tiene configurado Supabase (URL / SERVICE_KEY); "
+            "no se pueden gestionar las credenciales."
+        ) from exc
 
 
 def _find_auth_user_id(admin, email: str) -> str | None:
@@ -180,8 +191,43 @@ async def update_user(
     _guard_scope(data.get("role"), scope)
     if scope is not None:
         data.pop("clinic_id", None)  # no puede mover usuarios a otra clínica
+
+    # El email es la credencial de acceso: vive en Supabase Auth y en nuestra
+    # tabla. Cambiar solo una de las dos deja al usuario sin poder entrar (Auth)
+    # o invisible para la app (perfil), así que se cambian las dos o ninguna.
+    new_email = (data.pop("email", None) or "").strip().lower() or None
+    if new_email and new_email != user.email:
+        existing = await get_by_email(db, new_email)
+        if existing is not None and existing.id != user.id:
+            raise Conflict("El email ya está registrado")
+        _auth_admin().auth.admin.update_user_by_id(
+            str(user.id), {"email": new_email, "email_confirm": True}
+        )
+        user.email = new_email
+
     for k, v in data.items():
         setattr(user, k, v)
+    await db.flush()
+    await db.refresh(user)
+    return user
+
+
+async def set_user_password(
+    db: AsyncSession, user_id: uuid.UUID, new_password: str, scope: uuid.UUID | None = None
+) -> User:
+    """Un administrador asigna una contraseña nueva a otro usuario.
+
+    Es la salida cuando alguien no puede entrar y no hay forma de recuperar su
+    contraseña. Si se le deja la provisional, vuelve a quedar obligado a
+    cambiarla en el siguiente acceso.
+    """
+    user = await get_user(db, user_id, scope)
+    try:
+        _auth_admin().auth.admin.update_user_by_id(str(user.id), {"password": new_password})
+    except Exception as exc:  # no cumple la política del proyecto, etc.
+        raise BadRequest(f"No se pudo cambiar la contraseña: {exc}") from exc
+
+    user.must_change_password = new_password == settings.DEFAULT_USER_PASSWORD
     await db.flush()
     await db.refresh(user)
     return user
@@ -198,15 +244,7 @@ async def change_own_password(db: AsyncSession, user: User, new_password: str) -
         raise BadRequest("Elige una contraseña distinta de la provisional.")
 
     try:
-        admin = supabase_admin()
-    except RuntimeError as exc:
-        raise BadRequest(
-            "El servidor no tiene configurado Supabase (URL / SERVICE_KEY); "
-            "no se puede cambiar la contraseña."
-        ) from exc
-
-    try:
-        admin.auth.admin.update_user_by_id(str(user.id), {"password": new_password})
+        _auth_admin().auth.admin.update_user_by_id(str(user.id), {"password": new_password})
     except Exception as exc:  # p. ej. no cumple la política del proyecto
         raise BadRequest(f"No se pudo cambiar la contraseña: {exc}") from exc
 
@@ -214,6 +252,93 @@ async def change_own_password(db: AsyncSession, user: User, new_password: str) -
     await db.flush()
     await db.refresh(user)
     return user
+
+
+async def _history_counts(db: AsyncSession, user_id: uuid.UUID) -> dict[str, int]:
+    """Rastro de trabajo del usuario que se perdería si se borra la fila.
+
+    Las FK a `users` son todas ON DELETE SET NULL: Postgres borraría sin
+    protestar y dejaría casos, calibraciones y documentos sin responsable. En un
+    contexto clínico ese rastro es justo lo que no se puede perder, así que se
+    cuenta antes y se bloquea. `audit_logs` no entra: guarda el nombre y el rol
+    desnormalizados, así que sobrevive al borrado.
+    """
+    # Import local: estos módulos importan `users` y a nivel de módulo habría ciclo.
+    from app.modules.calibrations.models import Calibration
+    from app.modules.cases.models import Case, CaseActivity
+    from app.modules.documents.models import Document
+
+    async def count(stmt) -> int:
+        return int((await db.execute(select(func.count()).select_from(stmt))).scalar_one())
+
+    return {
+        "casos reportados": await count(
+            select(Case.id).where(Case.reported_by == user_id).subquery()
+        ),
+        "casos atendidos": await count(
+            select(Case.id).where(Case.assigned_to == user_id).subquery()
+        ),
+        "notas en casos": await count(
+            select(CaseActivity.id).where(CaseActivity.author_id == user_id).subquery()
+        ),
+        "documentos subidos": await count(
+            select(Document.id).where(Document.uploaded_by == user_id).subquery()
+        ),
+        "calibraciones": await count(
+            select(Calibration.id).where(Calibration.performed_by == user_id).subquery()
+        ),
+    }
+
+
+async def delete_user_permanently(
+    db: AsyncSession,
+    user_id: uuid.UUID,
+    *,
+    actor_id: uuid.UUID,
+    scope: uuid.UUID | None = None,
+) -> None:
+    """Borra de verdad: perfil, cuenta de acceso y hoja de vida.
+
+    Solo si el usuario no dejó rastro de trabajo. Para quien sí lo dejó, la
+    desactivación es la operación correcta: corta el acceso en cada petición y
+    conserva la trazabilidad.
+    """
+    user = await get_user(db, user_id, scope)
+    if user.id == actor_id:
+        raise BadRequest("No puedes eliminar tu propia cuenta.")
+
+    counts = await _history_counts(db, user_id)
+    rastro = [f"{n} {etiqueta}" for etiqueta, n in counts.items() if n]
+    if rastro:
+        raise Conflict(
+            f"{user.full_name} tiene historial en el sistema ({', '.join(rastro)}). "
+            "Borrarlo dejaría esos registros sin responsable. Desactívalo en su lugar: "
+            "pierde el acceso de inmediato y la trazabilidad se conserva."
+        )
+
+    # La unidad de servicio que lo tuviera como ingeniero por defecto quedaría
+    # sin asignación automática y en silencio; mejor dejarlo explícito.
+    from app.modules.sectors.models import Sector
+
+    for sector in (
+        (await db.execute(select(Sector).where(Sector.default_engineer_id == user_id)))
+        .scalars()
+        .all()
+    ):
+        sector.default_engineer_id = None
+
+    # La hoja de vida lleva datos personales: se va con el usuario. Si Storage
+    # falla, el borrado continúa (el archivo quedaría huérfano, no al revés).
+    if user.cv_path:
+        with contextlib.suppress(Exception):
+            sb.delete_file(user.cv_path)
+
+    # Auth primero: mientras la fila siga viva esto se puede reintentar. Al
+    # revés no — la cuenta quedaría viva bloqueando el email para siempre.
+    _auth_admin().auth.admin.delete_user(str(user.id))
+
+    await db.delete(user)
+    await db.flush()
 
 
 async def deactivate_user(

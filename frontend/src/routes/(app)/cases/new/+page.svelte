@@ -9,7 +9,7 @@
   import Textarea from '$lib/components/Textarea.svelte';
   import Button from '$lib/components/Button.svelte';
   import DatePicker from '$lib/components/DatePicker.svelte';
-  import { ClipboardList, UserCog } from 'lucide-svelte';
+  import { ClipboardList, TriangleAlert, UserCog } from 'lucide-svelte';
   import { casesApi } from '$lib/modules/cases/api';
   import { equipmentApi } from '$lib/modules/equipment/api';
   import { sectorsApi } from '$lib/modules/sectors/api';
@@ -27,6 +27,8 @@
   let sectors: Sector[] = [];
   let engineers: User[] = [];
   let loading = false;
+  /** Mientras carga, un «no hay unidades» sería mentira. */
+  let loadingContext = true;
 
   let form = {
     title: '',
@@ -95,6 +97,8 @@
       }
     } catch (e) {
       toasts.error(e instanceof Error ? e.message : 'Error cargando datos');
+    } finally {
+      loadingContext = false;
     }
   });
 
@@ -149,14 +153,32 @@
   <div>
     <Card title="Asignación" description="Unidad, equipo e ingeniero" icon={UserCog} accent="brand">
       <div class="grid gap-4">
-        <Select
-          label="Unidad de servicio *"
-          bind:value={form.sector_id}
-          required
-          on:change={onSectorChange}
-          options={sectors.map((s) => ({ value: s.id, label: s.name }))}
-          placeholder="— Selecciona la unidad —"
-        />
+        <div>
+          <Select
+            label="Unidad de servicio *"
+            bind:value={form.sector_id}
+            required
+            on:change={onSectorChange}
+            options={sectors.map((s) => ({ value: s.id, label: s.name }))}
+            placeholder="— Selecciona la unidad —"
+          />
+          <!-- Sin este aviso, el desplegable salía vacío sin explicación y el de
+               equipo decía «Elige primero una unidad»: imposible de interpretar. -->
+          {#if !loadingContext && sectors.length === 0}
+            <p class="mt-1 flex items-start gap-1.5 text-xs leading-relaxed text-amber-600">
+              <TriangleAlert class="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              <span>
+                {#if !$profile?.clinic_id && $profile?.role !== 'admin'}
+                  Tu usuario no tiene compañía asignada, por eso no ves ninguna unidad
+                  ni equipo. Pídele a tu administrador que te asigne una.
+                {:else}
+                  No hay unidades de servicio en esta compañía todavía.
+                  <a class="font-medium underline" href="/sectors">Crear una unidad</a>
+                {/if}
+              </span>
+            </p>
+          {/if}
+        </div>
         <div>
           <Select
             label="Equipo *"

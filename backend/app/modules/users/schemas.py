@@ -42,7 +42,17 @@ class PasswordChange(BaseModel):
     new_password: str = Field(min_length=6, max_length=128)
 
 
+class PasswordReset(BaseModel):
+    """Contraseña que un administrador asigna a otro usuario."""
+
+    new_password: str = Field(
+        default=settings.DEFAULT_USER_PASSWORD, min_length=6, max_length=128
+    )
+
+
 class UserUpdate(BaseModel):
+    # Cambiarlo mueve también la credencial en Supabase Auth (ver el servicio).
+    email: EmailStr | None = None
     full_name: str | None = None
     role: UserRole | None = None
     phone: str | None = None

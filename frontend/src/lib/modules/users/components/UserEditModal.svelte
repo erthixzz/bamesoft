@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from 'svelte';
-  import { FileText, Upload } from 'lucide-svelte';
+  import { FileText, KeyRound, Trash2, TriangleAlert, Upload } from 'lucide-svelte';
   import Modal from '$lib/components/Modal.svelte';
   import Input from '$lib/components/Input.svelte';
   import Select from '$lib/components/Select.svelte';
@@ -11,13 +11,14 @@
   import type { Clinic } from '$lib/modules/clinics/types';
   import type { UserRole } from '$lib/api/types';
   import { ROLE_LABELS, ALL_ROLES } from '$lib/utils/permissions';
+  import { DEFAULT_PASSWORD, MIN_PASSWORD_LENGTH } from '$lib/modules/users/constants';
   import { toasts } from '$lib/stores/toasts';
   import { role } from '$lib/stores/auth';
 
   export let open = false;
   export let user: User;
 
-  const dispatch = createEventDispatcher<{ saved: User }>();
+  const dispatch = createEventDispatcher<{ saved: User; deleted: string }>();
 
   let clinics: Clinic[] = [];
   let saving = false;
@@ -54,6 +55,7 @@
   }
 
   let form = {
+    email: '',
     full_name: '',
     role: 'client' as UserRole,
     phone: '',
@@ -61,9 +63,18 @@
     clinic_id: '',
     active: 'true',
   };
+  let errors: Record<string, string> = {};
+
+  // Contraseña: campo aparte del formulario. Se envía solo si se escribe algo,
+  // porque es una operación distinta (toca Supabase Auth, no el perfil).
+  let newPassword = '';
+  let resettingPwd = false;
+  let deleting = false;
+  let confirmDelete = false;
 
   function hydrate() {
     form = {
+      email: user.email,
       full_name: user.full_name,
       role: user.role,
       phone: user.phone ?? '',
@@ -71,6 +82,52 @@
       clinic_id: user.clinic_id ?? '',
       active: user.active ? 'true' : 'false',
     };
+    errors = {};
+    newPassword = '';
+    confirmDelete = false;
+  }
+
+  /** Un no-admin sin compañía entra pero no ve ni equipos ni unidades. */
+  $: sinCompania = form.role !== 'admin' && !form.clinic_id;
+
+  async function resetPassword() {
+    if (newPassword.length < MIN_PASSWORD_LENGTH) {
+      errors = { ...errors, newPassword: `Mínimo ${MIN_PASSWORD_LENGTH} caracteres` };
+      return;
+    }
+    resettingPwd = true;
+    try {
+      const updated = await usersApi.resetPassword(user.id, newPassword);
+      user = updated;
+      dispatch('saved', updated);
+      toasts.success(
+        newPassword === DEFAULT_PASSWORD
+          ? `Contraseña restablecida a la provisional. ${updated.full_name} deberá cambiarla al entrar.`
+          : 'Contraseña actualizada',
+      );
+      newPassword = '';
+      errors = { ...errors, newPassword: '' };
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'No se pudo cambiar la contraseña');
+    } finally {
+      resettingPwd = false;
+    }
+  }
+
+  async function removeUser() {
+    deleting = true;
+    try {
+      await usersApi.remove(user.id);
+      toasts.success(`${user.full_name} eliminado`);
+      dispatch('deleted', user.id);
+      open = false;
+    } catch (e) {
+      // El backend responde 409 con el motivo cuando hay historial que preservar.
+      toasts.error(e instanceof Error ? e.message : 'No se pudo eliminar el usuario');
+      confirmDelete = false;
+    } finally {
+      deleting = false;
+    }
   }
 
   // Hidratar SOLO al abrir el modal. Un `$: form = {...user}` reactivo se
@@ -100,9 +157,16 @@
   }));
 
   async function save() {
+    const e: Record<string, string> = {};
+    if (form.full_name.trim().length < 2) e.full_name = 'Nombre requerido';
+    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) e.email = 'Email inválido';
+    errors = e;
+    if (Object.keys(e).length) return;
+
     saving = true;
     try {
       const payload: UserUpdate = {
+        email: form.email.trim().toLowerCase(),
         full_name: form.full_name,
         role: form.role,
         phone: form.phone || null,
@@ -124,7 +188,13 @@
 
 <Modal bind:open title={`Editar ${user.full_name}`}>
   <div class="grid gap-4 sm:grid-cols-2">
-    <div class="sm:col-span-2"><Input label="Nombre completo" bind:value={form.full_name} /></div>
+    <div class="sm:col-span-2"><Input label="Nombre completo" bind:value={form.full_name} error={errors.full_name} /></div>
+    <div class="sm:col-span-2">
+      <Input label="Email (acceso)" type="email" bind:value={form.email} error={errors.email} />
+      <p class="mt-1 text-xs text-slate-400">
+        Es la credencial con la que entra: al cambiarlo, entrará con el nuevo.
+      </p>
+    </div>
     <Select label="Rol" bind:value={form.role} options={roleOptions} />
     {#if isSuper}
       <Select
@@ -133,6 +203,15 @@
         options={clinics.map((c) => ({ value: c.id, label: c.name }))}
         placeholder="— Sin compañía —"
       />
+    {/if}
+    {#if sinCompania}
+      <p class="sm:col-span-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-800">
+        <TriangleAlert class="mt-0.5 h-4 w-4 shrink-0" />
+        <span>
+          Sin compañía asignada puede iniciar sesión, pero no verá ningún equipo
+          ni unidad de servicio y no podrá crear casos. Asígnale una compañía.
+        </span>
+      </p>
     {/if}
     <Input label="Teléfono" bind:value={form.phone} />
     <Input label="Licencia / matrícula" bind:value={form.license_number} />
@@ -169,14 +248,64 @@
       </div>
     </div>
 
-    <div class="sm:col-span-2 rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
-      <span class="font-medium text-slate-600">Email:</span> {user.email}
-      <span class="ml-2 text-slate-400">(no editable)</span>
+    <!-- Contraseña: operación aparte, se aplica al instante y no espera a Guardar. -->
+    <div class="sm:col-span-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+      <span class="mb-1.5 block text-sm font-medium text-slate-600">Contraseña</span>
+      <div class="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <div class="flex-1">
+          <Input
+            bind:value={newPassword}
+            error={errors.newPassword}
+            placeholder={`Nueva contraseña (mínimo ${MIN_PASSWORD_LENGTH})`}
+          />
+        </div>
+        <Button variant="secondary" on:click={resetPassword} loading={resettingPwd}>
+          <KeyRound class="h-4 w-4" /> Cambiar
+        </Button>
+      </div>
+      <button
+        type="button"
+        class="mt-2 text-xs font-medium text-brand-600 hover:underline"
+        on:click={() => (newPassword = DEFAULT_PASSWORD)}
+      >
+        Usar la provisional ({DEFAULT_PASSWORD}) y pedir que la cambie al entrar
+      </button>
+    </div>
+
+    <!-- Eliminar: destructivo, con confirmación en dos pasos. -->
+    <div class="sm:col-span-2 rounded-lg border border-danger-200 bg-danger-50/50 px-3 py-3">
+      <span class="mb-1 block text-sm font-medium text-danger-700">Eliminar usuario</span>
+      {#if confirmDelete}
+        <p class="mb-2 text-xs leading-relaxed text-danger-700">
+          Se borrarán su perfil, su acceso y su hoja de vida. No se puede deshacer.
+          Si tiene casos o documentos a su nombre, se cancelará y te lo diré.
+        </p>
+        <div class="flex flex-wrap gap-2">
+          <Button variant="danger" on:click={removeUser} loading={deleting}>
+            <Trash2 class="h-4 w-4" /> Sí, eliminar definitivamente
+          </Button>
+          <button class="btn-secondary" type="button" on:click={() => (confirmDelete = false)}>
+            Cancelar
+          </button>
+        </div>
+      {:else}
+        <p class="mb-2 text-xs leading-relaxed text-slate-500">
+          Para quitarle el acceso conservando su historial, ponlo <strong>Inactivo</strong> arriba.
+          Eliminar solo es posible si nunca registró nada.
+        </p>
+        <button
+          type="button"
+          class="text-xs font-semibold text-danger-600 hover:underline"
+          on:click={() => (confirmDelete = true)}
+        >
+          Eliminar definitivamente…
+        </button>
+      {/if}
     </div>
   </div>
   <svelte:fragment slot="footer">
     <div class="flex justify-end gap-2">
-      <button class="btn-secondary" on:click={() => (open = false)}>Cancelar</button>
+      <button class="btn-secondary" type="button" on:click={() => (open = false)}>Cancelar</button>
       <Button on:click={save} loading={saving}>Guardar</Button>
     </div>
   </svelte:fragment>

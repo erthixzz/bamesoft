@@ -42,6 +42,12 @@ def upload_file(path: str, content: bytes, content_type: str = "application/octe
     return path
 
 
+def delete_file(path: str) -> None:
+    """Borra un archivo del bucket. Lanza si Storage falla."""
+    sb = supabase_admin()
+    sb.storage.from_(settings.STORAGE_BUCKET).remove([path])
+
+
 def signed_url(path: str, expires_in: int = 60 * 60) -> str:
     sb = supabase_admin()
     res = sb.storage.from_(settings.STORAGE_BUCKET).create_signed_url(path, expires_in)

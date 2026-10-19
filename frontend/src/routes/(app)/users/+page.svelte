@@ -22,7 +22,7 @@
   import { toasts } from '$lib/stores/toasts';
   import { timeFromNow, formatDateTime } from '$lib/utils/format';
   import type { UserRole } from '$lib/api/types';
-  import { Users, Copy, UserX, Pencil, Check, ShieldCheck, PlusCircle, Search, Eye } from 'lucide-svelte';
+  import { Users, Copy, UserX, UserCheck, Pencil, Check, ShieldCheck, PlusCircle, Search, Eye, TriangleAlert } from 'lucide-svelte';
 
   function roleLabel(r: string): string {
     return ROLE_LABELS[r as UserRole] ?? r;
@@ -111,15 +111,23 @@
     }
   }
 
+  async function reactivate(row: User) {
+    try {
+      await usersApi.update(row.id, { active: true });
+      toasts.success(`${row.full_name} reactivado`);
+      await load();
+    } catch (e) {
+      toasts.error(e instanceof Error ? e.message : 'Error al reactivar');
+    }
+  }
+
   const rowMenu = (row: User): CtxItem[] => [
-    { label: 'Editar', icon: Pencil, onClick: () => edit(row) },
+    { label: 'Editar, contraseña o eliminar', icon: Pencil, onClick: () => edit(row) },
     { label: 'Copiar email', icon: Copy, onClick: () => copy(row.email, 'Email copiado') },
-    ...(row.active
-      ? [
-          { divider: true } as CtxItem,
-          { label: 'Desactivar', icon: UserX, danger: true, onClick: () => deactivate(row) } as CtxItem,
-        ]
-      : []),
+    { divider: true } as CtxItem,
+    row.active
+      ? ({ label: 'Desactivar', icon: UserX, danger: true, onClick: () => deactivate(row) } as CtxItem)
+      : ({ label: 'Reactivar', icon: UserCheck, onClick: () => reactivate(row) } as CtxItem),
   ];
 </script>
 
@@ -153,7 +161,20 @@
             {row.full_name}
           </button>
         {:else if column === 'clinic_id'}
-          {row.clinic_id ? (clinicName[row.clinic_id] ?? '—') : '—'}
+          {#if row.clinic_id}
+            {clinicName[row.clinic_id] ?? '—'}
+          {:else if row.role === 'admin'}
+            <span class="text-sm text-slate-500">Todas</span>
+          {:else}
+            <!-- Sin compañía, un no-admin entra pero no ve equipos ni unidades:
+                 se veía como un guion y nadie lo relacionaba con el síntoma. -->
+            <span
+              class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+              title="Sin compañía no verá equipos ni unidades de servicio"
+            >
+              <TriangleAlert class="h-3 w-3" /> Sin compañía
+            </span>
+          {/if}
         {:else if column === 'role'}
           <Badge tone="blue">{roleLabel(row.role)}</Badge>
         {:else if column === 'last_seen_at'}
@@ -228,7 +249,7 @@
 </div>
 
 {#if editing}
-  <UserEditModal bind:open={editOpen} user={editing} on:saved={onSaved} />
+  <UserEditModal bind:open={editOpen} user={editing} on:saved={onSaved} on:deleted={onSaved} />
 {/if}
 
 <UserCreateModal bind:open={createOpen} on:created={onSaved} />
